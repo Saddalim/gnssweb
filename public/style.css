@@ -13,12 +13,16 @@ body {
   width: 100%;
 }
 
-#canvas3d-container {
+#canvas-eci-container {
   width: 100%;
   height: 40rem;
 }
 
-#canvas3d {
+div#canvas-ecef-container {
+  max-height: 40rem;
+}
+
+#canvas-eci {
   width: 100%;
   height: 100%;
 }

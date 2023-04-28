@@ -3,46 +3,110 @@ import { OrbitControls } from 'three/controls/OrbitControls.js';
 import * as utils from './utils.js';
 import {eci2three} from "./utils.js";
 
-// 2D map
-// TODO
+// =====================================================================================================================
+// 3D renderer (ECI frame)
 
-// 3D renderer
-
-const renderer = new THREE.WebGLRenderer({canvas: document.querySelector('#canvas3d')});
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 100, 100000 );
-const controls = new OrbitControls( camera, renderer.domElement );
+const eciRenderer = new THREE.WebGLRenderer({canvas: document.querySelector('#canvas-eci'), alpha: true});
+const eciScene = new THREE.Scene();
+const eciCamera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 100, 150000 );
+const eciControls = new OrbitControls( eciCamera, eciRenderer.domElement );
 
 const light1 = new THREE.HemisphereLight( 0xffffbb, 0x080820, 0.9 );
-scene.add( light1 );
+eciScene.add( light1 );
 const light2 = new THREE.AmbientLight( 0x404040, 0.3 );
-scene.add( light2 );
+eciScene.add( light2 );
 
 const earthGeometry = new THREE.SphereGeometry(6378.137);
 const earthMaterial = new THREE.MeshStandardMaterial( {color: 0x00ff00, wireframe: true });
 const earth = new THREE.Mesh( earthGeometry, earthMaterial );
-scene.add(earth);
+eciScene.add(earth);
 
-camera.position.set(40000, 20000, 20000);
-controls.update();
+eciCamera.position.set(45000, 25000, 25000);
+eciControls.update();
 
-function resizeCanvasToDisplaySize() {
-    const canvas = renderer.domElement;
-    // look up the size the canvas is being displayed
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
+// =====================================================================================================================
+// 2D renderer (ECEF frame)
 
-    // adjust displayBuffer size to match
-    if (canvas.width !== width || canvas.height !== height) {
-        // you must pass false here or three.js sadly fights the browser
-        renderer.setSize(width, height, false);
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
+const ECEFCANVASSIZE = 1000;
+const ecefCanvasCenter = ECEFCANVASSIZE / 2;
 
-        // update any render target sizes here
+const ecefStage = new Konva.Stage({
+    container: 'canvas-ecef',
+    width: ECEFCANVASSIZE,
+    height: ECEFCANVASSIZE
+});
+
+const fixLayer = new Konva.Layer();
+const satLayer = new Konva.Layer();
+
+// elevation circles
+{
+    const elevationStep = 30;
+    const radiusStep = (1 / 90) * (ECEFCANVASSIZE / 2);
+    for (let elevation = 0; elevation < 90; elevation += elevationStep) {
+        const elevationCircle = new Konva.Circle({
+            x: ecefCanvasCenter,
+            y: ecefCanvasCenter,
+            radius: ecefCanvasCenter - elevation * radiusStep,
+            stroke: '#000',
+            strokeWidth: 2
+        });
+        fixLayer.add(elevationCircle);
     }
 }
 
+// azimuth lines
+{
+    const azimuthStep = 30;
+    const angleStep = (1 / 360);
+    for (let azimuth = 0; azimuth < 360; azimuth += azimuthStep) {
+        const azimuthLine = new Konva.Line({
+            points: [
+                ecefCanvasCenter,
+                ecefCanvasCenter,
+                ecefCanvasCenter - Math.sin(utils.deg2rad(azimuth)) * ecefCanvasCenter, // flip W-E
+                ecefCanvasCenter - Math.cos(utils.deg2rad(azimuth)) * ecefCanvasCenter  // 2D canvas' Y coordinate points down, not up
+            ],
+            stroke: '#000',
+            strokeWidth: 2
+        });
+        fixLayer.add(azimuthLine);
+    }
+}
+
+// labels
+{
+    const labels = [{txt: 'N', deg: 0}, {txt: 'W', deg: Math.PI / 2.0}, {txt: 'S', deg: Math.PI}, {txt: 'E', deg: -Math.PI / 2.0}];
+    for (const labelData of labels) {
+        const label = new Konva.Text({
+            x: ecefCanvasCenter + Math.sin(labelData.deg) * ecefCanvasCenter * 0.97,
+            y: ecefCanvasCenter - Math.cos(labelData.deg) * ecefCanvasCenter * 0.97,
+            text: labelData.txt,
+            fill: '#ccc',
+            fontSize: 30
+        });
+        label.offsetX(label.width() / 2);
+        label.offsetY(label.height() / 2);
+        fixLayer.add(label);
+    }
+}
+
+const observerCircle = new Konva.Circle({
+    x: ecefCanvasCenter,
+    y: ecefCanvasCenter,
+    radius: 10,
+    fill: '#f0f',
+    stroke: '#000',
+    strokeWidth: 4
+});
+fixLayer.add(observerCircle);
+
+ecefStage.add(fixLayer);
+ecefStage.add(satLayer);
+
+fixLayer.draw();
+
+// =====================================================================================================================
 // constants
 const ONEDAY = 86400;
 
@@ -54,18 +118,56 @@ let loadingSplash = null;
 let visibilityLineChart = null;
 let elevationChart = null;
 
-// scene elements
+// ECI scene elements
 let satelliteIcons = [];
 let observerMarker = null;
 
 // sat data
 let satellitePositionData = null;
 let observerPositionData = null;
+let visibilityData = null;
 let minEpoch = null;
 let maxEpoch = null;
 let epochStep = null;
 
 let lastDrawnSatPosEpoch = null;
+
+// =====================================================================================================================
+// responsivity
+function resizeCanvasToDisplaySize(canvas) {
+    //const canvas = eciRenderer.domElement;
+    // look up the size the canvas is being displayed
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+
+    // adjust displayBuffer size to match
+    if (canvas.width !== width || canvas.height !== height) {
+        // you must pass false here or three.js sadly fights the browser
+        eciRenderer.setSize(width, height, false);
+        eciCamera.aspect = width / height;
+        eciCamera.updateProjectionMatrix();
+
+        // update any render target sizes here
+    }
+}
+
+function fitStageIntoParentContainer() {
+    const containerWidth = document.querySelector('#canvas-ecef').clientWidth;
+    const containerHeight = document.querySelector('#canvas-ecef-container').clientHeight;
+
+    const containerSize = Math.min(containerWidth, containerHeight);
+    const scale = containerSize / ECEFCANVASSIZE;
+
+    ecefStage.width(ECEFCANVASSIZE * scale);
+    ecefStage.height(ECEFCANVASSIZE * scale);
+    ecefStage.scale({ x: scale, y: scale });
+}
+
+fitStageIntoParentContainer();
+// adapt the stage on any window resize
+window.addEventListener('resize', fitStageIntoParentContainer);
+
+// =====================================================================================================================
 
 function showSplash()
 {
@@ -84,13 +186,39 @@ function drawOrbitLine(scene, points, color = 0xffffff) {
     scene.add( line );
 }
 
-function drawSatellite(scene, pos, color = 0xffffff) {
+function drawSatelliteEci(scene, pos, color = 0xffffff) {
     const satGeometry = new THREE.BufferGeometry();
     satGeometry.setAttribute('position', new THREE.Float32BufferAttribute( eci2three(pos), 3));
     const satMaterial = new THREE.PointsMaterial({ color: color, size: 2000.0 });
     const point = new THREE.Points( satGeometry, satMaterial);
     satelliteIcons.push(point);
     scene.add(point);
+}
+
+function drawSatellitesEcef(time) {
+    // TODO cache shapes
+    satLayer.destroyChildren();
+    const idx = Math.round((time - minEpoch) / epochStep);
+    for (const satData of visibilityData) {
+
+        const angles = satData.data[idx];
+
+        // TODO handle satellites below 0 elevation (might be visible from a high elevation)
+        if (! angles.hasOwnProperty('elevation') || angles.elevation < 0.0)
+            continue;
+
+        const r = ((90.0 - angles.elevation) / 90.0) * (ECEFCANVASSIZE / 2.0);
+        const satPoint = new Konva.Circle({
+            x: ecefCanvasCenter - r * Math.sin(utils.deg2rad(angles.azimuth)), // flip W-E
+            y: ecefCanvasCenter - r * Math.cos(utils.deg2rad(angles.azimuth)),
+            radius: 5,
+            fill: satData.borderColor,
+            stroke: '#000',
+            strokeWidth: 2
+        });
+        satLayer.add(satPoint);
+    }
+    satLayer.draw();
 }
 
 function drawObserverMarker(scene, time) {
@@ -128,13 +256,14 @@ function updateSatellites(scene, time) {
     const idx = Math.round((time - minEpoch) / epochStep);
     for (const satelliteData of satellitePositionData)
     {
-        drawSatellite(scene, satelliteData.data[idx], utils.getColorStrForConstellationId(satelliteData.constellationId));
+        drawSatelliteEci(scene, satelliteData.data[idx], utils.getColorStrForConstellationId(satelliteData.constellationId));
     }
+    drawSatellitesEcef(time);
 }
 
 function setSatellitesTime(scene, time) {
     timerSlider.value = time;
-    updateSatellites(scene, time);
+    timerSlider.dispatchEvent(new Event('input'));
 }
 
 function syncCharts(source) {
@@ -156,23 +285,15 @@ function syncCharts(source) {
 }
 
 function animate() {
-    resizeCanvasToDisplaySize();
-    controls.update();
+    resizeCanvasToDisplaySize(eciRenderer.domElement);
+    eciControls.update();
 
-    renderer.render( scene, camera );
+    eciRenderer.render( eciScene, eciCamera );
     requestAnimationFrame( animate );
 }
 animate();
 
-const constellationColors = {
-    'G': 0x0000ff, // US
-    'R': 0xff0000, // RU
-    'E': 0x00ff00, // EU
-    'C': 0x00ffff, // CN
-    'J': 0xffffff, // JP
-    'I': 0xff7f27, // IN
-};
-
+// =====================================================================================================================
 
 window.onload = (evt) => {
 
@@ -358,7 +479,7 @@ window.onload = (evt) => {
                         if (atEpoch !== lastDrawnSatPosEpoch)
                         {
                             lastDrawnSatPosEpoch = atEpoch;
-                            setSatellitesTime(scene, atEpoch);
+                            setSatellitesTime(eciScene, atEpoch);
                         }
                     }
                 }
@@ -403,18 +524,18 @@ window.onload = (evt) => {
 
                 satellitePositionData = data.positionData;
                 observerPositionData = data.observerPositionData;
-                console.log(observerPositionData);
+                visibilityData = data.visibilityLineData;
 
                 timerSlider.min = minEpoch;
                 timerSlider.max = maxEpoch;
                 timerSlider.value = minEpoch;
-                timerSlider.dispatchEvent(new Event('change'));
+                timerSlider.dispatchEvent(new Event('input'));
                 document.querySelector('#timeDisplay').innerHTML = moment(minEpoch).format('YYYY-MM-DD HH:mm');
 
                 for (const positionData of data.positionData) {
-                    drawOrbitLine(scene, positionData.data, utils.getColorStrForConstellationId(positionData.constellationId));
+                    drawOrbitLine(eciScene, positionData.data, utils.getColorStrForConstellationId(positionData.constellationId));
                 }
-                updateSatellites(scene, minEpoch);
+                updateSatellites(eciScene, minEpoch);
 
                 console.log("Done");
                 hideSplash();
@@ -424,13 +545,13 @@ window.onload = (evt) => {
             hideSplash();
         });
 
-        drawObserverMarker(scene, formData);
+        drawObserverMarker(eciScene, formData);
 
     });
 
     timerSlider.addEventListener('input', (evt) => {
         const timestamp = parseInt(evt.target.value);
-        updateSatellites(scene, timestamp);
+        updateSatellites(eciScene, timestamp);
         document.querySelector('#timeDisplay').innerHTML = moment(timestamp).format('YYYY-MM-DD HH:mm');
     });
 }

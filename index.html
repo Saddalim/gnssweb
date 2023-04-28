@@ -23,6 +23,8 @@
     <script src="https://cdn.jsdelivr.net/npm/moment@^2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@^1"></script>
 
+    <script src="https://unpkg.com/konva@8.4.3/konva.min.js"></script>
+
     <!-- use fork for CJS4 support: cdm-consultores/chartjs-plugin-crosshair -->
     <script src="/chartjs-plugin-crosshair.min.js"></script>
 
@@ -103,8 +105,15 @@
       <div class="col">
         <hr>
       </div>
-      <div class="col" id="canvas3d-container">
-        <canvas id="canvas3d"></canvas>
+      <div class="col">
+        <div class="row row-cols-2">
+          <div class="col" id="canvas-eci-container">
+            <canvas id="canvas-eci"></canvas>
+          </div>
+          <div class="col" id="canvas-ecef-container">
+            <div id="canvas-ecef"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div id="loading-overlay">

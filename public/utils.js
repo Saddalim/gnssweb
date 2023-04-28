@@ -6,9 +6,14 @@ export function isAngleBetween(a, x1, x2) {
 }
 
 const RAD2DEG = 180.0 / Math.PI;
+const DEG2RAD = 1.0 / RAD2DEG;
 
 export function rad2deg(rad) {
     return rad * RAD2DEG;
+}
+
+export function deg2rad(deg) {
+    return deg * DEG2RAD;
 }
 
 export function eci2three(pos, asArray = true) {
