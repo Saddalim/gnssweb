@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/controls/OrbitControls.js';
 import * as utils from './utils.js';
-
+import {eci2three} from "./utils.js";
 
 // 2D map
 // TODO
@@ -43,20 +43,29 @@ function resizeCanvasToDisplaySize() {
     }
 }
 
-function drawOrbitLine(scene, points, color = 0xffffff) {
-    const orbitGeometry = new THREE.BufferGeometry().setFromPoints( points );
-    const orbitMaterial = new THREE.LineBasicMaterial({ color: color });
-    const line = new THREE.Line( orbitGeometry, orbitMaterial );
-    scene.add( line );
-}
+// constants
+const ONEDAY = 86400;
 
+// DOM elements
+let timerSlider = null;
+let loadingSplash = null;
+
+// charts
+let visibilityLineChart = null;
+let elevationChart = null;
+
+// scene elements
 let satelliteIcons = [];
-let positionData = null;
+let observerMarker = null;
+
+// sat data
+let satellitePositionData = null;
+let observerPositionData = null;
 let minEpoch = null;
 let maxEpoch = null;
 let epochStep = null;
 
-let loadingSplash = null;
+let lastDrawnSatPosEpoch = null;
 
 function showSplash()
 {
@@ -68,13 +77,42 @@ function hideSplash()
     loadingSplash.style.display = 'none';
 }
 
+function drawOrbitLine(scene, points, color = 0xffffff) {
+    const orbitGeometry = new THREE.BufferGeometry().setFromPoints( points.map((pt) => eci2three(pt, false)) );
+    const orbitMaterial = new THREE.LineBasicMaterial({ color: color });
+    const line = new THREE.Line( orbitGeometry, orbitMaterial );
+    scene.add( line );
+}
+
 function drawSatellite(scene, pos, color = 0xffffff) {
     const satGeometry = new THREE.BufferGeometry();
-    satGeometry.setAttribute('position', new THREE.Float32BufferAttribute( [pos.x, pos.y, pos.z], 3));
+    satGeometry.setAttribute('position', new THREE.Float32BufferAttribute( eci2three(pos), 3));
     const satMaterial = new THREE.PointsMaterial({ color: color, size: 2000.0 });
     const point = new THREE.Points( satGeometry, satMaterial);
     satelliteIcons.push(point);
     scene.add(point);
+}
+
+function drawObserverMarker(scene, time) {
+
+    if (observerMarker !== null)
+        scene.remove(observerMarker);
+
+    if (observerPositionData === null)
+        return;
+
+    const idx = Math.round((time - minEpoch) / epochStep);
+    const pos = observerPositionData[idx];
+    const satGeometry = new THREE.BufferGeometry();
+    satGeometry.setAttribute('position', new THREE.Float32BufferAttribute( eci2three(pos), 3));
+    const satMaterial = new THREE.PointsMaterial({ color: 0xff00ff, size: 2000.0 });
+
+    const daysToRotate = (time - minEpoch) / ONEDAY / 1000.0;
+    earth.rotation.y = daysToRotate * Math.PI * 2.0;
+
+    observerMarker = new THREE.Points( satGeometry, satMaterial);
+    scene.add(observerMarker);
+
 }
 
 function removeAllSatellites(scene) {
@@ -86,10 +124,34 @@ function removeAllSatellites(scene) {
 
 function updateSatellites(scene, time) {
     removeAllSatellites(scene);
+    drawObserverMarker(scene, time);
     const idx = Math.round((time - minEpoch) / epochStep);
-    for (const satelliteData of positionData)
+    for (const satelliteData of satellitePositionData)
     {
         drawSatellite(scene, satelliteData.data[idx], utils.getColorStrForConstellationId(satelliteData.constellationId));
+    }
+}
+
+function setSatellitesTime(scene, time) {
+    timerSlider.value = time;
+    updateSatellites(scene, time);
+}
+
+function syncCharts(source) {
+    let min = source.chart.scales.x.min;
+    let max = source.chart.scales.x.max;
+
+    if (source.chart === visibilityLineChart)
+    {
+        elevationChart.options.scales.x.min = min;
+        elevationChart.options.scales.x.max = max;
+        elevationChart.update();
+    }
+    else
+    {
+        visibilityLineChart.options.scales.x.min = min;
+        visibilityLineChart.options.scales.x.max = max;
+        visibilityLineChart.update();
     }
 }
 
@@ -116,72 +178,8 @@ window.onload = (evt) => {
 
     loadingSplash = document.getElementById('loading-overlay');
 
-    let visibilityChart = new Chart(
-        document.querySelector('#visibility-chart-container'),
-        {
-            type: 'scatter',
-            data: {
-                datasets: []
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-                plugins: {
-                    tooltip: {
-                        enabled: true,
-                        callbacks: {
-                            label: function(ctx) {
-                                return ctx.dataset.label + " : " + moment(ctx.parsed.x).format('MM-DD HH:mm');
-                            }
-                        }
-                    },
-                    legend: {
-                        display: false
-                    },
-                    zoom: {
-                        pan: {
-                            enabled: true,
-                            mode: 'x'
-                        },
-                        zoom: {
-                            wheel: {
-                                enabled: true,
-                            },
-                            pinch: {
-                                enabled: true
-                            },
-                            mode: 'x',
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: {
-                            callback: function (val, idx, ticks) {
-                                return moment(val).format('MM-DD HH:mm');
-                            },
-                            maxRotation: 70,
-                            minRotation: 70
-                        }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Satellite idx within given range'
-                        },
-                    }
-                },
-                interaction: {
-                    intersect: false,
-                    mode: 'x'
-                }
-            },
-        }
-    );
-
-    let elevationChart = new Chart(
-        document.querySelector('#elevation-chart-container'),
+    visibilityLineChart = new Chart(
+        document.querySelector('#visibility-line-chart-container'),
         {
             type: 'line',
             data: {
@@ -205,12 +203,19 @@ window.onload = (evt) => {
                     },
                     tooltip: {
                         enabled: true,
-                        mode: 'nearest'
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(ctx) {
+                                return ctx.dataset.label + ': ' + ctx.raw.elevation.toFixed(1) + '@' + ctx.raw.azimuth.toFixed(1);
+                            }
+                        }
                     },
                     zoom: {
                         pan: {
                             enabled: true,
-                            mode: 'x'
+                            mode: 'x',
+                            onPan: syncCharts
                         },
                         zoom: {
                             wheel: {
@@ -220,6 +225,15 @@ window.onload = (evt) => {
                                 enabled: true
                             },
                             mode: 'x',
+                            onZoom: syncCharts
+                        },
+                    },
+                    crosshair: {
+                        sync: {
+                            enabled: true
+                        },
+                        zoom: {
+                            enabled: false
                         }
                     }
                 },
@@ -233,7 +247,93 @@ window.onload = (evt) => {
                             }
                         },
                         ticks: {
-                            sampleSize: 2
+                            sampleSize: 2,
+                            minRotation: 0,
+                            maxRotation: 0
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Visibility [idx]'
+                        },
+                        min: 0,
+                        max: 90.0
+                    }
+                },
+            },
+        }
+    );
+
+    elevationChart = new Chart(
+        document.querySelector('#elevation-chart-container'),
+        {
+            type: 'line',
+            data: {
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                parsing: false,
+                normalized: true,
+                snapGaps: false,
+
+                elements: {
+                    point: {
+                        radius: 0
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        /*enabled: true,*/
+                        mode: "index",
+                        intersect: false,
+                        itemSort: (a, b) => b.raw.y - a.raw.y
+                    },
+                    zoom: {
+                        pan: {
+                            enabled: true,
+                            mode: 'x',
+                            onPan: syncCharts
+                        },
+                        zoom: {
+                            wheel: {
+                                enabled: true,
+                            },
+                            pinch: {
+                                enabled: true
+                            },
+                            mode: 'x',
+                            onZoom: syncCharts
+                        }
+                    },
+                    crosshair: {
+                        sync: {
+                            enabled: true
+                        },
+                        zoom: {
+                            enabled: false
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            displayFormats: {
+                                hour: 'HH:mm',
+                                minute: 'HH:mm'
+                            }
+                        },
+                        ticks: {
+                            sampleSize: 2,
+                            minRotation: 0,
+                            maxRotation: 0
                         }
                     },
                     y: {
@@ -245,15 +345,28 @@ window.onload = (evt) => {
                         max: 90.0
                     }
                 },
-                interaction: {
-                    intersect: false,
-                    mode: 'nearest'
-                }
             },
+            plugins: [{
+                id: 'globeDisplayer',
+                afterDatasetsDraw(chart, args, pluginOptions) {
+
+                },
+                beforeTooltipDraw(chart, args, options) {
+                    if (args.tooltip.dataPoints.length > 0)
+                    {
+                        const atEpoch = args.tooltip.dataPoints[0].parsed.x;
+                        if (atEpoch !== lastDrawnSatPosEpoch)
+                        {
+                            lastDrawnSatPosEpoch = atEpoch;
+                            setSatellitesTime(scene, atEpoch);
+                        }
+                    }
+                }
+            }]
         }
     );
 
-    let timerSlider = document.querySelector('#timeSelector');
+    timerSlider = document.querySelector('#timeSelector');
     let calcBtn = document.querySelector('#start-calc-btn');
 
     calcBtn.addEventListener('click', (evt) => {
@@ -272,38 +385,31 @@ window.onload = (evt) => {
         }).then((resp) => {
             resp.json().then((data) => {
                 console.log("Got sat data, drawing...");
-                let visibilityTimesPerSat = data.visibilityData;
-                let visibilityChartData = [];
-                let satIdx = 0;
-                for (const [satIdent, epochs] of Object.entries(visibilityTimesPerSat)) {
-                    visibilityChartData.push({
-                        label: satIdent,
-                        data: epochs.map((epoch) => ({x: epoch, y: satIdx})),
-                        backgroundColor: utils.getColorStrForConstellationId(satIdent.substring(0, 1))
-                    });
-                    ++satIdx;
-                }
 
-                minEpoch = visibilityChartData[0].data[0].x;
-                maxEpoch = visibilityChartData[0].data.at(-1).x;
-                epochStep = visibilityChartData[0].data[1].x - visibilityChartData[0].data[0].x;
+                minEpoch = data.visibilityLineData[0].data[0].x;
+                maxEpoch = data.visibilityLineData[0].data.at(-1).x;
+                epochStep = data.visibilityLineData[0].data[1].x - data.visibilityLineData[0].data[0].x;
 
-                visibilityChart.data.datasets = visibilityChartData;
-                visibilityChart.options.scales.x.min = minEpoch;
-                visibilityChart.options.scales.x.max = maxEpoch;
-                visibilityChart.update();
+                visibilityLineChart.data.datasets = data.visibilityLineData;
+                visibilityLineChart.options.scales.x.min = minEpoch;
+                visibilityLineChart.options.scales.x.max = maxEpoch;
+                visibilityLineChart.options.scales.y.max = data.visibilityLineData.length + 1; // +1 so that there is a buffer for the line width
+                visibilityLineChart.update();
 
-                elevationChart.options.scales.x.min = minEpoch * 1000;
-                elevationChart.options.scales.x.max = maxEpoch * 1000;
+                elevationChart.options.scales.x.min = minEpoch;
+                elevationChart.options.scales.x.max = maxEpoch;
                 elevationChart.data.datasets = data.elevationData;
                 elevationChart.update();
 
-                positionData = data.positionData;
+                satellitePositionData = data.positionData;
+                observerPositionData = data.observerPositionData;
+                console.log(observerPositionData);
 
                 timerSlider.min = minEpoch;
                 timerSlider.max = maxEpoch;
                 timerSlider.value = minEpoch;
                 timerSlider.dispatchEvent(new Event('change'));
+                document.querySelector('#timeDisplay').innerHTML = moment(minEpoch).format('YYYY-MM-DD HH:mm');
 
                 for (const positionData of data.positionData) {
                     drawOrbitLine(scene, positionData.data, utils.getColorStrForConstellationId(positionData.constellationId));
@@ -317,11 +423,14 @@ window.onload = (evt) => {
             console.error(err);
             hideSplash();
         });
+
+        drawObserverMarker(scene, formData);
+
     });
 
     timerSlider.addEventListener('input', (evt) => {
         const timestamp = parseInt(evt.target.value);
         updateSatellites(scene, timestamp);
-        document.querySelector('#timeDisplay').innerHTML = new Date(timestamp * 1000).toISOString();
+        document.querySelector('#timeDisplay').innerHTML = moment(timestamp).format('YYYY-MM-DD HH:mm');
     });
 }

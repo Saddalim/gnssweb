@@ -11,6 +11,13 @@ export function rad2deg(rad) {
     return rad * RAD2DEG;
 }
 
+export function eci2three(pos, asArray = true) {
+    if (asArray)
+        return [pos.y, pos.z, pos.x];
+    else
+        return { x: pos.y, y: pos.z, z:pos.x };
+}
+
 const constellationColors = {
     'G': 0x3282F6, // US
     'R': 0xff0000, // RU
