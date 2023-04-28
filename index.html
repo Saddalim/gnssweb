@@ -38,11 +38,11 @@
             </div>
             <label for="input-azim-min" class="col-sm-2 col-form-label">Min azimuth [°]</label>
             <div class="col-sm-2">
-              <input type="number" min="0.0" max="360.0" step="1.0" name="azim-min" id="input-azim-min" class="form-control" value="170">
+              <input type="number" min="0.0" max="360.0" step="1.0" name="azim_min" id="input-azim-min" class="form-control" value="170">
             </div>
             <label for="input-elev-min" class="col-sm-2 col-form-label">Min elevation [°]</label>
             <div class="col-sm-2">
-              <input type="number" min="0.0" max="90.0" step="1.0" name="elev-min" id="input-elev-min" class="form-control" value="0">
+              <input type="number" min="0.0" max="90.0" step="1.0" name="elev_min" id="input-elev-min" class="form-control" value="0">
             </div>
           </div>
           <div class="row mb-1">
@@ -52,19 +52,23 @@
             </div>
             <label for="input-azim-max" class="col-sm-2 col-form-label">Max azimuth [°]</label>
             <div class="col-sm-2">
-              <input type="number" min="0.0" max="360.0" step="1.0" name="azim-max" id="input-azim-max" class="form-control" value="260">
+              <input type="number" min="0.0" max="360.0" step="1.0" name="azim_max" id="input-azim-max" class="form-control" value="260">
             </div>
             <label for="input-elev-max" class="col-sm-2 col-form-label">Max elevation [°]</label>
             <div class="col-sm-2">
-              <input type="number" min="0.0" max="90.0" step="1.0" name="elev-max" id="input-elev-max" class="form-control" value="20">
+              <input type="number" min="0.0" max="90.0" step="1.0" name="elev_max" id="input-elev-max" class="form-control" value="20">
             </div>
           </div>
           <div class="row mb-1">
-            <label for="input-height" class="col-sm-2 col-form-label">Height [m]</label>
+            <label for="input-height" class="col-sm-2 col-form-label">Height [m AMSL]</label>
             <div class="col-sm-2">
               <input type="number" step="1.0" name="height" id="input-height" class="form-control" value="190">
             </div>
-            <div class="col-sm-4"></div>
+            <div class="col-sm-4">
+              <label class="col-form-label">
+                <span style="color: #3282F6;">GPS</span> <span style="color: #00FF00;">GALILEO</span> <span style="color: #FF0000;">GLONASS</span>
+              </label>
+            </div>
             <div class="col-sm-4">
               <button class="btn btn-primary w-100" id="start-calc-btn">Calculate</button>
             </div>
@@ -91,6 +95,12 @@
       </div>
       <div class="col">
         <span id="timeDisplay"></span>
+      </div>
+    </div>
+    <div id="loading-overlay">
+      <div id="loading-overlay-content" class="text-center">
+        <img class="img-fluid pb-2" src="./load.gif" alt="...">
+        <h2 id="loading-overlay-text" class="text-center">Loading...</h2>
       </div>
     </div>
     <!--<div id="cesiumContainer"></div>-->

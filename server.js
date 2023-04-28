@@ -3,13 +3,14 @@ import bodyParser from "body-parser";
 import { fileURLToPath } from 'url';
 import * as path from 'path';
 import * as sp3parser from './sp3parser.js';
+import * as utils from './public/utils.js';
 import satellite from "satellite.js";
 import fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const config = JSON.parse(fs.readFileSync("settings.json"));
+const config = JSON.parse(fs.readFileSync(__dirname + "/settings.json"));
 console.log("Config:", config);
 
 // set up GNSS data
@@ -21,19 +22,6 @@ const observer = {
     longitude: satellite.degreesToRadians(18.928819),
     height: 0.190 // [km]
 };
-*/
-
-//const satData = sp3parser.parseFile('d:\\BME\\_ur\\2\\proj\\COD.EPH_5D', observer);
-//const almanacData = almanacParser.parseFile('d:\\BME\\_ur\\2\\proj\\gnss.txt');
-/*
-for (const [constellationId, satellites] of Object.entries(satData)) {
-    for (const [satId, epochs] of Object.entries(satellites)) {
-        for (const [epoch, pos] of Object.entries(epochs)) {
-            const posEcf = satellite.eciToEcf(pos, epoch);
-            pos.lookAngles = satellite.ecfToLookAngles(observer, posEcf);
-        }
-    }
-}
 */
 
 // set up HTTP server
@@ -53,12 +41,67 @@ app.post('/req', urlencodedParser, (req, res) => {
     const observer = {
         latitude: satellite.degreesToRadians(parseFloat(req.body.lat)),
         longitude: satellite.degreesToRadians(parseFloat(req.body.lon)),
-        height: parseFloat(req.body.height) / 1000.0 // [km]
+        height: parseFloat(req.body.height) / 1000.0, // [km]
+        azimuthLimits: {min: satellite.degreesToRadians(parseFloat(req.body.azim_min)), max: satellite.degreesToRadians(parseFloat(req.body.azim_max))},
+        elevationLimits: {min: satellite.degreesToRadians(parseFloat(req.body.elev_min)), max: satellite.degreesToRadians(parseFloat(req.body.elev_max))}
     };
 
+    // TODO parse when new file is available and cache
+    const rawData = sp3parser.parseFile(config.gnssFilesPath + '/COD.EPH_5D', observer);
+
+    let visibilityTimesPerSat = {};
+    let elevationDatasets = [];
+    let positionDatasets = [];
+
+    for (const [constellationId, satellites] of Object.entries(rawData)) {
+        for (const [satId, epochs] of Object.entries(satellites)) {
+            let elevationDataset = [];
+            let positionDataset = [];
+            for (const [epoch, epochData] of Object.entries(epochs)) {
+
+                let epochNum = parseInt(epoch);
+
+                // elevation data
+                // TODO take elevation into account while filtering for elevation - a sat with negative elevation might be visible for an observer high enough
+                elevationDataset.push({
+                    x: epochNum * 1000, // JS handles epoch 1970 timestamps in milliseconds
+                    y: epochData.lookAngles.elevation > 0.0 ? utils.rad2deg(epochData.lookAngles.elevation) : null
+                });
+
+                // visibility data
+                if (utils.isAngleBetween(epochData.lookAngles.azimuth, observer.azimuthLimits.min, observer.azimuthLimits.max)
+                    && utils.isAngleBetween(epochData.lookAngles.elevation, observer.elevationLimits.min, observer.elevationLimits.max)) {
+                    if (!visibilityTimesPerSat.hasOwnProperty(constellationId + satId))
+                        visibilityTimesPerSat[constellationId + satId] = [];
+                    visibilityTimesPerSat[constellationId + satId].push(epochNum);
+                }
+
+                // position data
+                positionDataset.push({
+                    x: epochData.pos.x,
+                    y: epochData.pos.y,
+                    z: epochData.pos.z
+                });
+            }
+
+            elevationDatasets.push({
+                label: constellationId + satId,
+                data: elevationDataset,
+                borderColor: utils.getColorStrForConstellationId(constellationId),
+                borderWidth: 1.5
+            });
+            positionDatasets.push({
+                label: constellationId + satId,
+                data: positionDataset,
+                constellationId: constellationId,
+            })
+        }
+    }
+
     res.json({
-        satData: sp3parser.parseFile(config.gnssFilesPath + '/COD.EPH_5D', observer),
-        //almanacData: almanacData
+        visibilityData: visibilityTimesPerSat,
+        elevationData: elevationDatasets,
+        positionData: positionDatasets
     });
 });
 

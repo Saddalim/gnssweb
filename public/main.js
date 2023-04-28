@@ -1,39 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/controls/OrbitControls.js';
-import * as GNSS from './gnss.js';
-//import {Chart, LineController, LineElement, PointElement, CategoryScale, LinearScale, ScatterController, Title, Legend, Colors, Tooltip} from 'chart';
+import * as utils from './utils.js';
 
-//Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, ScatterController, Title, Legend, Colors, Tooltip);
 
-function deg2rad(deg) {
-    return deg * Math.PI / 180.0;
-}
-
-function rad2deg(rad) {
-    return rad * 180.0 / Math.PI;
-}
-
-function map_obj(object, fn) {
-    const retArray = {};
-    for (const [fieldName, fieldValue] of Object.entries(object)) {
-        retArray[fieldName] = fn(fieldValue);
-    }
-    return retArray;
-}
-
-/*
-const observerAzimuth = { min: deg2rad(170.0), max: deg2rad(260.0) } // [rad] // TODO handle overlap over 0 (north)
-const observerElevation = { min: deg2rad(0.0), max: deg2rad(10.0) } // [rad]
-*/
-// Cesium renderer
-/*
-Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyM2RmZWJlYS1mMTRmLTQ1ZTMtYjY2Ni1lYWFhZGJjZjQyNmYiLCJpZCI6MTM1MDY3LCJpYXQiOjE2ODIxODAxNjV9.xu6N4J0a5GsJ0J1CTidLht72YvlgEjFhJGG7Hfzf940";
-const viewer = new Cesium.Viewer('cesiumContainer', {
-
-    terrainProvider: Cesium.createWorldTerrain()
-
-});
-*/
 // 2D map
 // TODO
 
@@ -43,9 +12,6 @@ const renderer = new THREE.WebGLRenderer({canvas: document.querySelector('#canva
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 100, 100000 );
 const controls = new OrbitControls( camera, renderer.domElement );
-
-//renderer.setSize( window.innerWidth, window.innerHeight );
-//document.body.appendChild( renderer.domElement );
 
 const light1 = new THREE.HemisphereLight( 0xffffbb, 0x080820, 0.9 );
 scene.add( light1 );
@@ -85,7 +51,22 @@ function drawOrbitLine(scene, points, color = 0xffffff) {
 }
 
 let satelliteIcons = [];
-let satData = null;
+let positionData = null;
+let minEpoch = null;
+let maxEpoch = null;
+let epochStep = null;
+
+let loadingSplash = null;
+
+function showSplash()
+{
+    loadingSplash.style.display = 'block';
+}
+
+function hideSplash()
+{
+    loadingSplash.style.display = 'none';
+}
 
 function drawSatellite(scene, pos, color = 0xffffff) {
     const satGeometry = new THREE.BufferGeometry();
@@ -105,17 +86,10 @@ function removeAllSatellites(scene) {
 
 function updateSatellites(scene, time) {
     removeAllSatellites(scene);
-    for (const [constellationId, satellites] of Object.entries(satData.satData)) {
-        for (const [satId, epochs] of Object.entries(satellites)) {
-            // TODO calculate index from min,max,time instead of iterating/
-            for (const [epoch, pos] of Object.entries(epochs)) {
-                if (parseInt(epoch) > time)
-                {
-                    drawSatellite(scene, pos, constellationColors[constellationId]);
-                    break;
-                }
-            }
-        }
+    const idx = Math.round((time - minEpoch) / epochStep);
+    for (const satelliteData of positionData)
+    {
+        drawSatellite(scene, satelliteData.data[idx], utils.getColorStrForConstellationId(satelliteData.constellationId));
     }
 }
 
@@ -140,6 +114,7 @@ const constellationColors = {
 
 window.onload = (evt) => {
 
+    loadingSplash = document.getElementById('loading-overlay');
 
     let visibilityChart = new Chart(
         document.querySelector('#visibility-chart-container'),
@@ -151,12 +126,13 @@ window.onload = (evt) => {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false,
                 plugins: {
                     tooltip: {
                         enabled: true,
                         callbacks: {
                             label: function(ctx) {
-                                return ctx.dataset.label + " : " + new Date(ctx.parsed.x * 1000).toISOString();
+                                return ctx.dataset.label + " : " + moment(ctx.parsed.x).format('MM-DD HH:mm');
                             }
                         }
                     },
@@ -183,9 +159,17 @@ window.onload = (evt) => {
                     x: {
                         ticks: {
                             callback: function (val, idx, ticks) {
-                                return new Date(val * 1000).toISOString();
-                            }
+                                return moment(val).format('MM-DD HH:mm');
+                            },
+                            maxRotation: 70,
+                            minRotation: 70
                         }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Satellite idx within given range'
+                        },
                     }
                 },
                 interaction: {
@@ -206,10 +190,10 @@ window.onload = (evt) => {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                parsing: {
-                    xAxisKey: 'epoch',
-                    yAxisKey: 'epochData.lookAngles.elevation'
-                },
+                animation: false,
+                parsing: false,
+                normalized: true,
+                snapGaps: true,
                 elements: {
                     point: {
                         radius: 0
@@ -243,7 +227,13 @@ window.onload = (evt) => {
                     x: {
                         type: 'time',
                         time: {
-                            unit: 'day'
+                            displayFormats: {
+                                hour: 'HH:mm',
+                                minute: 'HH:mm'
+                            }
+                        },
+                        ticks: {
+                            sampleSize: 2
                         }
                     },
                     y: {
@@ -255,9 +245,9 @@ window.onload = (evt) => {
                         max: 90.0
                     }
                 },
-                hover: {
-                    mode: 'dataset',
-                    intersect: false
+                interaction: {
+                    intersect: false,
+                    mode: 'nearest'
                 }
             },
         }
@@ -269,91 +259,65 @@ window.onload = (evt) => {
     calcBtn.addEventListener('click', (evt) => {
         evt.stopPropagation();
         evt.preventDefault();
+        showSplash();
         const formData = new URLSearchParams();
         for (const [configName, configValue] of new FormData(document.querySelector('#observer-form'))) {
             formData.append(configName, configValue);
         }
 
-        console.log(formData);
+        console.log("Requesting sat data...");
         fetch('/req', {
             method: 'post',
             body: formData,
         }).then((resp) => {
             resp.json().then((data) => {
-                console.log("Got sat data, calculating...");
-                satData = data;
-
-                let elevationChartData = [];
-                let visibilityTimesPerSat = {};
-                let minEpoch = null;
-                let maxEpoch = null;
-                let observerAzimuth = {min: parseFloat(document.getElementById('input-azim-min').value), max: parseFloat(document.getElementById('input-azim-max').value)};
-                let observerElevation = {min: parseFloat(document.getElementById('input-elev-min').value), max: parseFloat(document.getElementById('input-elev-max').value)};
-
-                for (const [constellationId, satellites] of Object.entries(data.satData)) {
-                    for (const [satId, epochs] of Object.entries(satellites)) {
-                        let chartDataSet = [];
-                        const orbitPts = [];
-                        for (const [epoch, epochData] of Object.entries(epochs)) {
-                            epochData.lookAngles.azimuth = rad2deg(epochData.lookAngles.azimuth);
-                            epochData.lookAngles.elevation = rad2deg(epochData.lookAngles.elevation);
-                            orbitPts.push(new THREE.Vector3(epochData.pos.x, epochData.pos.y, epochData.pos.z));
-
-                            if (epochData.lookAngles.elevation < 0.0)
-                                continue;
-
-                            let epochNum = parseInt(epoch);
-                            chartDataSet.push({'epoch': epochNum * 1000, epochData: epochData});
-                            if (minEpoch === null || minEpoch > epochNum)
-                                minEpoch = epochNum;
-                            if (maxEpoch === null || maxEpoch < epochNum)
-                                maxEpoch = epochNum;
-
-                            // visibility chart data
-                            // TODO handle azimuth overlap over 0 (north)
-                            if (epochData.lookAngles.azimuth > observerAzimuth.min && epochData.lookAngles.azimuth < observerAzimuth.max
-                                && epochData.lookAngles.elevation > observerElevation.min && epochData.lookAngles.elevation < observerElevation.max) {
-                                if (!visibilityTimesPerSat.hasOwnProperty(constellationId + satId))
-                                    visibilityTimesPerSat[constellationId + satId] = [];
-                                visibilityTimesPerSat[constellationId + satId].push(epochNum);
-                            }
-                        }
-                        // 3d visualization data
-                        drawOrbitLine(scene, orbitPts, constellationColors[constellationId]);
-
-                        // elevation chart data
-                        elevationChartData.push({label: constellationId + satId, data: chartDataSet});
-                    }
-                }
-
+                console.log("Got sat data, drawing...");
+                let visibilityTimesPerSat = data.visibilityData;
                 let visibilityChartData = [];
                 let satIdx = 0;
                 for (const [satIdent, epochs] of Object.entries(visibilityTimesPerSat)) {
-                    const colorCode = '#' + constellationColors[satIdent.substring(0, 1)].toString(16).padStart(6, '0');
                     visibilityChartData.push({
                         label: satIdent,
                         data: epochs.map((epoch) => ({x: epoch, y: satIdx})),
-                        backgroundColor: colorCode
+                        backgroundColor: utils.getColorStrForConstellationId(satIdent.substring(0, 1))
                     });
                     ++satIdx;
                 }
 
+                minEpoch = visibilityChartData[0].data[0].x;
+                maxEpoch = visibilityChartData[0].data.at(-1).x;
+                epochStep = visibilityChartData[0].data[1].x - visibilityChartData[0].data[0].x;
+
                 visibilityChart.data.datasets = visibilityChartData;
+                visibilityChart.options.scales.x.min = minEpoch;
+                visibilityChart.options.scales.x.max = maxEpoch;
                 visibilityChart.update();
 
-                elevationChart.data.datasets = elevationChartData;
+                elevationChart.options.scales.x.min = minEpoch * 1000;
+                elevationChart.options.scales.x.max = maxEpoch * 1000;
+                elevationChart.data.datasets = data.elevationData;
                 elevationChart.update();
+
+                positionData = data.positionData;
 
                 timerSlider.min = minEpoch;
                 timerSlider.max = maxEpoch;
                 timerSlider.value = minEpoch;
                 timerSlider.dispatchEvent(new Event('change'));
+
+                for (const positionData of data.positionData) {
+                    drawOrbitLine(scene, positionData.data, utils.getColorStrForConstellationId(positionData.constellationId));
+                }
+                updateSatellites(scene, minEpoch);
+
+                console.log("Done");
+                hideSplash();
             });
         }).catch((err) => {
             console.error(err);
+            hideSplash();
         });
     });
-
 
     timerSlider.addEventListener('input', (evt) => {
         const timestamp = parseInt(evt.target.value);
