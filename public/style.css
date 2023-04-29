@@ -3,8 +3,31 @@ body {
   color: #ccc;
 }
 
+.header img {
+  height: 2.5rem;
+}
+
+.header .btn img {
+  height: 1em;
+  margin-bottom: 0.2em;
+}
+
+.header h3 {
+  color: #fff;
+}
+
 .chart-row {
-  height: 20rem;
+  height: 18.5rem;
+}
+
+.bute-name {
+  font-size: 60%;
+  font-weight: 400;
+  line-height: normal;
+}
+
+.bute-name a {
+  color: #39f;
 }
 
 .chart-container {
@@ -15,11 +38,15 @@ body {
 
 #canvas-eci-container {
   width: 100%;
-  height: 40rem;
+  /*height: 40rem;*/
 }
 
 div#canvas-ecef-container {
   max-height: 40rem;
+}
+
+div#canvas-ecef div.konvajs-content {
+  margin: 0 auto;
 }
 
 #canvas-eci {
@@ -29,6 +56,10 @@ div#canvas-ecef-container {
 
 #timeSelector-container {
   width: 100%;
+}
+
+#map-container {
+  height: 15rem;
 }
 
 #timeSelector {

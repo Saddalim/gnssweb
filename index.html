@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GNSS ReflectoLoc</title>
+    <title>GNSS Planner</title>
 
     <script type="importmap">
       {
@@ -23,76 +23,99 @@
     <script src="https://cdn.jsdelivr.net/npm/moment@^2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@^1"></script>
 
-    <script src="https://unpkg.com/konva@8.4.3/konva.min.js"></script>
-
     <!-- use fork for CJS4 support: cdm-consultores/chartjs-plugin-crosshair -->
     <script src="/chartjs-plugin-crosshair.min.js"></script>
 
+    <script src="https://unpkg.com/konva@8.4.3/konva.min.js"></script>
+
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+
+    <script src="/Semicircle.js"></script>
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin=""/>
     <!--<link href="https://cesium.com/downloads/cesiumjs/releases/1.104/Build/Cesium/Widgets/widgets.css" rel="stylesheet">-->
     <link rel="stylesheet" href="/style.css">
   </head>
   <body>
-    <div class="row row-cols-1 m-1">
+    <div class="row header m-1 mb-2 border-bottom g-1">
       <div class="col">
-        <form id="observer-form">
-          <div class="row mb-1">
-            <label for="input-lat" class="col-sm-2 col-form-label">Lat [°]</label>
-            <div class="col-sm-2">
-              <input type="text" name="lat" id="input-lat" class="form-control" value="47.461412">
-            </div>
-            <label for="input-azim-min" class="col-sm-2 col-form-label">Min azimuth [°]</label>
-            <div class="col-sm-2">
-              <input type="number" min="0.0" max="360.0" step="1.0" name="azim_min" id="input-azim-min" class="form-control" value="170">
-            </div>
-            <label for="input-elev-min" class="col-sm-2 col-form-label">Min elevation [°]</label>
-            <div class="col-sm-2">
-              <input type="number" min="0.0" max="90.0" step="1.0" name="elev_min" id="input-elev-min" class="form-control" value="0">
-            </div>
-          </div>
-          <div class="row mb-1">
-            <label for="input-lon" class="col-sm-2 col-form-label">Lon [°]</label>
-            <div class="col-sm-2">
-              <input type="text" name="lon" id="input-lon" class="form-control" value="18.928819">
-            </div>
-            <label for="input-azim-max" class="col-sm-2 col-form-label">Max azimuth [°]</label>
-            <div class="col-sm-2">
-              <input type="number" min="0.0" max="360.0" step="1.0" name="azim_max" id="input-azim-max" class="form-control" value="260">
-            </div>
-            <label for="input-elev-max" class="col-sm-2 col-form-label">Max elevation [°]</label>
-            <div class="col-sm-2">
-              <input type="number" min="0.0" max="90.0" step="1.0" name="elev_max" id="input-elev-max" class="form-control" value="20">
-            </div>
-          </div>
-          <div class="row mb-1">
-            <label for="input-height" class="col-sm-2 col-form-label">Height [m AMSL]</label>
-            <div class="col-sm-2">
-              <input type="number" step="1.0" name="height" id="input-height" class="form-control" value="190">
-            </div>
-            <div class="col-sm-4">
-              <label class="col-form-label">
-                <span style="color: #3282F6;">GPS</span> <span style="color: #00FF00;">GALILEO</span> <span style="color: #FF0000;">GLONASS</span>
-              </label>
-            </div>
-            <div class="col-sm-4">
-              <button class="btn btn-primary w-100" id="start-calc-btn">Calculate</button>
-            </div>
-          </div>
-        </form>
+        <h3>GNSS Planner</h3>
       </div>
+      <div class="col-auto d-none d-md-block">
+        <a href="https://github.com/Saddalim/gnssweb" target="_blank" class="btn btn-sm btn-outline-primary"><img src="/github-mark-white.svg"> View on GitHub</a>
+      </div>
+      <div class="col d-none d-sm-block text-right text-nowrap bute-name">
+        <a href="https://www.bme.hu/" target="_blank">Budapest University of Technology and Economics</a>
+        <br>
+        <a href="https://epito.bme.hu/" target="_blank">Faculty of Civil Engineering</a>
+        <br>
+        <a href="https://epito.bme.hu/department-of-geodesy-and-surveying" target="_blank">Department of Geodesy and Surveying</a>
+      </div>
+      <div class="col-auto text-right">
+        <a href="https://www.bme.hu/" target="_blank"><img src="/bme_logo_feher.png"></a>
+      </div>
+    </div>
+    <form id="observer-form">
+      <div class="row m-1 g-1">
+        <div class="col-12 col-md-5" id="map-container">
+          <div id="map" class="w-100 h-100"></div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="row row-cols-1 row-cols-sm-2">
+            <label for="input-lat" class="col col-form-label mb-1">Lat [°]</label>
+            <div class="col">
+              <input type="number" name="lat" min="-90" max="90" step="0.0001" id="input-lat" class="form-control location-input">
+            </div>
+            <label for="input-lon" class="col col-form-label mb-1">Lon [°]</label>
+            <div class="col">
+              <input type="number" name="lon" min="-180" max="180" step="0.0001" id="input-lon" class="form-control location-input">
+            </div>
+            <label for="input-height" class="col col-form-label mb-1">AMSL [m]</label>
+            <div class="col">
+              <input type="number" step="1.0" name="height" id="input-height" class="form-control">
+            </div>
+
+          </div>
+        </div>
+        <div class="col-6 col-md-4">
+          <div class="row mb-1">
+            <label for="input-azim-min" class="col-sm-4 col-form-label">Azimuth [°]</label>
+            <div class="col-sm-4">
+              <input type="number" min="0.0" max="360.0" step="1.0" name="azim_min" id="input-azim-min" class="form-control w-100 location-input">
+            </div>
+            <div class="col-sm-4">
+              <input type="number" min="0.0" max="360.0" step="1.0" name="azim_max" id="input-azim-max" class="form-control location-input">
+            </div>
+          </div>
+          <div class="row mb-1">
+            <label for="input-elev-min" class="col-sm-4 col-form-label">Elevation [°]</label>
+            <div class="col-sm-4">
+              <input type="number" min="0.0" max="90.0" step="1.0" name="elev_min" id="input-elev-min" class="form-control">
+            </div>
+            <div class="col-sm-4">
+              <input type="number" min="0.0" max="90.0" step="1.0" name="elev_max" id="input-elev-max" class="form-control">
+            </div>
+          </div>
+
+          <button class="btn btn-primary w-100" id="start-calc-btn">Calculate</button>
+        </div>
+      </div>
+    </form>
+    <div class="row row-cols-1 row-cols-md-2 m-1">
       <div class="col chart-row chart-container">
         <canvas id="visibility-line-chart-container"></canvas>
-      </div>
-      <div class="col">
-        <hr>
       </div>
       <div class="col chart-row chart-container">
         <canvas id="elevation-chart-container"></canvas>
       </div>
-      <div class="col">
-        <hr>
+      <div class="col chart-row" id="canvas-eci-container">
+        <canvas id="canvas-eci"></canvas>
       </div>
-      <div class="col" id="timeSelector-container">
+      <div class="col chart-row" id="canvas-ecef-container">
+        <div id="canvas-ecef"></div>
+      </div>
+      <div class="col d-none">
         <div class="row">
           <div class="col">
             <input type="range" id="timeSelector" step="300">
@@ -101,18 +124,7 @@
             <span id="timeDisplay"></span>
           </div>
         </div>
-      </div>
-      <div class="col">
-        <hr>
-      </div>
-      <div class="col">
         <div class="row row-cols-2">
-          <div class="col" id="canvas-eci-container">
-            <canvas id="canvas-eci"></canvas>
-          </div>
-          <div class="col" id="canvas-ecef-container">
-            <div id="canvas-ecef"></div>
-          </div>
         </div>
       </div>
     </div>

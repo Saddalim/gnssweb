@@ -109,6 +109,15 @@ fixLayer.draw();
 // =====================================================================================================================
 // constants
 const ONEDAY = 86400;
+const defaultObserver = {
+    lat: 47.4862,
+    lon: 19.0560,
+    height: 150,
+    minAzimuth: 140,
+    maxAzimuth: 175,
+    minElevation: 0,
+    maxElevation: 20
+};
 
 // DOM elements
 let timerSlider = null;
@@ -211,7 +220,7 @@ function drawSatellitesEcef(time) {
         const satPoint = new Konva.Circle({
             x: ecefCanvasCenter - r * Math.sin(utils.deg2rad(angles.azimuth)), // flip W-E
             y: ecefCanvasCenter - r * Math.cos(utils.deg2rad(angles.azimuth)),
-            radius: 5,
+            radius: 7,
             fill: satData.borderColor,
             stroke: '#000',
             strokeWidth: 2
@@ -368,6 +377,15 @@ window.onload = (evt) => {
                             }
                         },
                         ticks: {
+                            major: {
+                                enabled: true
+                            },
+                            font: (ctx) => {
+                                return ctx.tick && ctx.tick.major ? { weight: 'bold', color: '#fff' } : {};
+                            },
+                            color: (ctx) => {
+                                return ctx.tick && ctx.tick.major ? '#ccc' : '#666';
+                            },
                             sampleSize: 2,
                             minRotation: 0,
                             maxRotation: 0
@@ -452,6 +470,15 @@ window.onload = (evt) => {
                             }
                         },
                         ticks: {
+                            major: {
+                                enabled: true
+                            },
+                            font: (ctx) => {
+                                return ctx.tick && ctx.tick.major ? { weight: 'bold', color: '#fff' } : {};
+                            },
+                            color: (ctx) => {
+                                return ctx.tick && ctx.tick.major ? '#ccc' : '#666';
+                            },
                             sampleSize: 2,
                             minRotation: 0,
                             maxRotation: 0
@@ -489,6 +516,46 @@ window.onload = (evt) => {
 
     timerSlider = document.querySelector('#timeSelector');
     let calcBtn = document.querySelector('#start-calc-btn');
+
+    let map = L.map('map').setView([47.4827, 19.0561], 14);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+    let marker = L.marker([defaultObserver.lat, defaultObserver.lon]).addTo(map);
+    let azimuthMarker = L.semiCircle([defaultObserver.lat, defaultObserver.lon], {
+        radius: 500,
+        startAngle: defaultObserver.minAzimuth,
+        stopAngle: defaultObserver.maxAzimuth
+    }).addTo(map);
+    map.on('click', (evt) => {
+        marker.setLatLng(evt.latlng);
+        azimuthMarker.setLatLng(evt.latlng);
+        document.getElementById('input-lat').value = evt.latlng.lat.toFixed(6);
+        document.getElementById('input-lon').value = evt.latlng.lng.toFixed(6);
+    });
+
+    document.querySelectorAll('.location-input').forEach((input) => {
+        input.addEventListener('change', (evt) => {
+            const latLon = {
+                lat: document.getElementById('input-lat').value,
+                lng: document.getElementById('input-lon').value
+            };
+            azimuthMarker.setLatLng(latLon);
+            marker.setLatLng(latLon);
+            azimuthMarker.setStartAngle(document.getElementById('input-azim-min').value);
+            azimuthMarker.setStopAngle(document.getElementById('input-azim-max').value);
+        });
+    })
+
+    document.getElementById('input-lat').value = defaultObserver.lat;
+    document.getElementById('input-lon').value = defaultObserver.lon;
+    document.getElementById('input-height').value = defaultObserver.height;
+
+    document.getElementById('input-elev-min').value = defaultObserver.minElevation;
+    document.getElementById('input-elev-max').value = defaultObserver.maxElevation;
+
+    document.getElementById('input-azim-min').value = defaultObserver.minAzimuth;
+    document.getElementById('input-azim-max').value = defaultObserver.maxAzimuth;
 
     calcBtn.addEventListener('click', (evt) => {
         evt.stopPropagation();
@@ -555,3 +622,4 @@ window.onload = (evt) => {
         document.querySelector('#timeDisplay').innerHTML = moment(timestamp).format('YYYY-MM-DD HH:mm');
     });
 }
+
