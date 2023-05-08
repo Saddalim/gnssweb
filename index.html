@@ -104,22 +104,30 @@
               </div>
             </div>
           </form>
-          <div class="row mt-1 g-1 p-1 border">
-            <div class="col">
+          <div class="row mt-1 g-1 p-1 border justify-content-between">
+            <div class="col-auto">
               3D display:
             </div>
-            <div class="col">
+            <div class="col-auto">
               <div class="row">
                 <div class="col-auto">
-                  <label for="input-config-fix-3d" class="">ECI</label>
+                  <label for="input-config-3d-fix" class="">ECI</label>
                 </div>
                 <div class="col-auto form-check form-switch">
-                  <input type="checkbox" role="switch" name="input-config-fix-3d" id="input-config-fix-3d" class="form-check-input">
-                  <label for="input-config-fix-3d" class="form-check-label">ECEF</label>
+                  <input type="checkbox" role="switch" name="input-config-3d-fix" id="input-config-3d-fix" class="form-check-input">
+                  <label for="input-config-3d-fix" class="form-check-label">ECEF</label>
                 </div>
               </div>
             </div>
-            <div class="col m-0 text-end">
+            <div class="col-auto form-check">
+              <input type="checkbox" id="input-config-3d-show-orbits" class="form-check-input" checked>
+              <label for="input-config-3d-show-orbits" class="form-check-label">Show orbits</label>
+            </div>
+            <div class="col-auto form-check">
+              <input type="checkbox" id="input-config-3d-highlight-orbits" class="form-check-input" checked>
+              <label for="input-config-3d-highlight-orbits" class="form-check-label">Highlight orbits</label>
+            </div>
+            <div class="col-auto m-0 text-end">
               <button class="btn btn-sm btn-outline-danger" id="input-btn-reset-3d-cam">Reset camera</button>
             </div>
           </div>

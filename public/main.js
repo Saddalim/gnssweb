@@ -126,6 +126,8 @@ const invisibleSatOpacity = 0.3;
 let timerSlider = null;
 let loadingSplash = null;
 let ecefSwitch3d = null;
+let cb3dShowOrbits = null;
+let cb3dHightlightOrbits = null;
 
 // charts
 let visibilityLineChart = null;
@@ -201,10 +203,27 @@ function drawOrbitLine(scene, points, color = 0xffffff) {
     return line;
 }
 
+function drawOrbitLines() {
+    if (cb3dShowOrbits.checked) {
+        if (satelliteOrbitLines.length === 0) {
+            satellitePositionData.forEach((positionData, satIdx) => {
+                satelliteOrbitLines[satIdx] = drawOrbitLine(eciScene, positionData.data, utils.getColorOfConstellation(positionData.constellationId));
+            });
+        }
+    }
+    else
+    {
+        for (const orbitLine of satelliteOrbitLines) {
+            eciScene.remove(orbitLine);
+        }
+        satelliteOrbitLines = [];
+    }
+}
+
 function drawSatelliteEci(scene, pos, color = 0xffffff, isVisible = false) {
     const satGeometry = new THREE.BufferGeometry();
     satGeometry.setAttribute('position', new THREE.Float32BufferAttribute( eci2three(pos), 3));
-    const satMaterial = new THREE.PointsMaterial({ color: color, transparent: true, opacity: isVisible ? 1.0 : invisibleSatOpacity, size: 2000.0 });
+    const satMaterial = new THREE.PointsMaterial({ color: color, transparent: true, opacity: (cb3dHightlightOrbits.checked && !isVisible) ? invisibleSatOpacity : 1.0, size: 2000.0 });
     const point = new THREE.Points( satGeometry, satMaterial);
     satelliteIcons.push(point);
     scene.add(point);
@@ -271,10 +290,6 @@ function rotate3dEcefCamera(deltaT) {
     eciControls.target.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotationAngle);
 }
 
-function resetEciCamera() {
-    eciControls.reset();
-}
-
 function removeAllSatellites(scene) {
     for (const satelliteIcon of satelliteIcons) {
         scene.remove(satelliteIcon);
@@ -301,7 +316,9 @@ function updateSatellites(scene, time) {
     satellitePositionData.forEach((satelliteData, satIdx) => {
         const isVisible = visibilityData[satIdx].data[idx].y !== null;
         drawSatelliteEci(scene, satelliteData.data[idx], utils.getColorOfConstellation(satelliteData.constellationId), isVisible);
-        satelliteOrbitLines[satIdx].material.opacity = (isVisible ? 1.0 : invisibleOrbitOpacity);
+        const orbitLine = satelliteOrbitLines[satIdx];
+        if (orbitLine !== undefined)
+            orbitLine.material.opacity = ((cb3dHightlightOrbits.checked && !isVisible) ? invisibleOrbitOpacity : 1.0);
     });
     drawSatellitesEcef(time);
 
@@ -346,9 +363,11 @@ animate();
 window.onload = (evt) => {
 
     eciControls.saveState();
-    
+
     loadingSplash = document.getElementById('loading-overlay');
-    ecefSwitch3d = document.getElementById('input-config-fix-3d');
+    ecefSwitch3d = document.getElementById('input-config-3d-fix');
+    cb3dShowOrbits = document.getElementById('input-config-3d-show-orbits');
+    cb3dHightlightOrbits = document.getElementById('input-config-3d-highlight-orbits');
 
     visibilityLineChart = new Chart(
         document.querySelector('#visibility-line-chart-container'),
@@ -625,9 +644,7 @@ window.onload = (evt) => {
                 observerPositionData = data.observerPositionData;
                 visibilityData = data.visibilityLineData;
 
-                satellitePositionData.forEach((positionData, satIdx) => {
-                    satelliteOrbitLines[satIdx] = drawOrbitLine(eciScene, positionData.data, utils.getColorOfConstellation(positionData.constellationId));
-                });
+                drawOrbitLines();
                 updateSatellites(eciScene, minEpoch);
 
                 console.log("Done");
@@ -644,6 +661,16 @@ window.onload = (evt) => {
 
     document.getElementById('input-btn-reset-3d-cam').addEventListener('click', () => {
         eciControls.reset();
+    });
+
+    cb3dShowOrbits.addEventListener('change', () => {
+        drawOrbitLines();
+        updateSatellites(eciScene, lastDrawnSatPosEpoch);
+    });
+
+    cb3dHightlightOrbits.addEventListener('change', () => {
+        drawOrbitLines();
+        updateSatellites(eciScene, lastDrawnSatPosEpoch);
     })
 }
 
