@@ -20,7 +20,7 @@ export function eci2three(pos, asArray = true) {
     if (asArray)
         return [pos.y, pos.z, pos.x];
     else
-        return { x: pos.y, y: pos.z, z:pos.x };
+        return { x: pos.y, y: pos.z, z: pos.x };
 }
 
 const constellationColors = {

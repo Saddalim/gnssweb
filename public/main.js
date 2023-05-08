@@ -109,6 +109,7 @@ fixLayer.draw();
 // =====================================================================================================================
 // constants
 const ONEDAY = 86400;
+const ONEDAYMS = ONEDAY * 1000;
 const defaultObserver = {
     lat: 47.4862,
     lon: 19.0560,
@@ -124,6 +125,7 @@ const invisibleSatOpacity = 0.3;
 // DOM elements
 let timerSlider = null;
 let loadingSplash = null;
+let ecefSwitch3d = null;
 
 // charts
 let visibilityLineChart = null;
@@ -252,12 +254,25 @@ function drawObserverMarker(scene, time) {
     satGeometry.setAttribute('position', new THREE.Float32BufferAttribute( eci2three(pos), 3));
     const satMaterial = new THREE.PointsMaterial({ color: 0xff00ff, size: 2000.0 });
 
-    const daysToRotate = (time - minEpoch) / ONEDAY / 1000.0;
+    const daysToRotate = (time - minEpoch) / ONEDAYMS;
     earth.rotation.y = daysToRotate * Math.PI * 2.0;
 
     observerMarker = new THREE.Points( satGeometry, satMaterial);
     scene.add(observerMarker);
 
+}
+
+function rotate3dEcefCamera(deltaT) {
+    if (deltaT === 0.0)
+        return;
+
+    const rotationAngle = Math.PI * 2.0 * (deltaT / ONEDAYMS);
+    eciCamera.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotationAngle);
+    eciControls.target.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotationAngle);
+}
+
+function resetEciCamera() {
+    eciControls.reset();
 }
 
 function removeAllSatellites(scene) {
@@ -268,7 +283,11 @@ function removeAllSatellites(scene) {
 }
 
 function updateSatellites(scene, time) {
+    const deltaT = time - lastDrawnSatPosEpoch;
+
     removeAllSatellites(scene);
+    if (ecefSwitch3d.checked)
+        rotate3dEcefCamera(deltaT);
     drawObserverMarker(scene, time);
 
     if (satellitePositionData == null)
@@ -285,6 +304,8 @@ function updateSatellites(scene, time) {
         satelliteOrbitLines[satIdx].material.opacity = (isVisible ? 1.0 : invisibleOrbitOpacity);
     });
     drawSatellitesEcef(time);
+
+    lastDrawnSatPosEpoch = time;
 }
 
 function onChartMouseMove(chart, evt, scene) {
@@ -324,7 +345,10 @@ animate();
 
 window.onload = (evt) => {
 
+    eciControls.saveState();
+    
     loadingSplash = document.getElementById('loading-overlay');
+    ecefSwitch3d = document.getElementById('input-config-fix-3d');
 
     visibilityLineChart = new Chart(
         document.querySelector('#visibility-line-chart-container'),
@@ -617,5 +641,9 @@ window.onload = (evt) => {
         drawObserverMarker(eciScene, formData);
 
     });
+
+    document.getElementById('input-btn-reset-3d-cam').addEventListener('click', () => {
+        eciControls.reset();
+    })
 }
 
