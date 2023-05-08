@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/controls/OrbitControls.js';
 import * as utils from './utils.js';
-import {eci2three} from "./utils.js";
+import {eci2three, isAngleBetween} from "./utils.js";
 
 // =====================================================================================================================
 // 3D renderer (ECI frame)
@@ -358,6 +358,12 @@ function animate() {
 }
 animate();
 
+function setMapAzimuthAngles(marker, min, max) {
+    // Leaflet/Semicircle bugs if angle overlaps 0 degrees. Work around by providing minimum azimuth as negative angle
+    marker.setStartAngle(isAngleBetween(0, min, max) ? min - 360 : min);
+    marker.setStopAngle(max);
+}
+
 // =====================================================================================================================
 
 window.onload = (evt) => {
@@ -593,8 +599,7 @@ window.onload = (evt) => {
             };
             azimuthMarker.setLatLng(latLon);
             marker.setLatLng(latLon);
-            azimuthMarker.setStartAngle(document.getElementById('input-azim-min').value);
-            azimuthMarker.setStopAngle(document.getElementById('input-azim-max').value);
+            setMapAzimuthAngles(azimuthMarker, document.getElementById('input-azim-min').value, document.getElementById('input-azim-max').value);
         });
     })
 
