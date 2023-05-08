@@ -33,12 +33,9 @@ body {
 .chart-container {
   position: relative;
   margin: auto;
-  width: 100%;
 }
 
 #canvas-eci-container {
-  width: 100%;
-  /*height: 40rem;*/
 }
 
 div#canvas-ecef-container {

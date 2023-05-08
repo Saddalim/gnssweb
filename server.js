@@ -109,13 +109,13 @@ app.post('/req', urlencodedParser, (req, res) => {
             visibilityLineDatasets.push({
                 label: constellationId + satId,
                 data: visibilityLineDataset,
-                borderColor: utils.getColorStrForConstellationId(constellationId),
+                borderColor: utils.getColorStrOfConstellation(constellationId),
                 borderWidth: 3
             });
             elevationDatasets.push({
                 label: constellationId + satId,
                 data: elevationDataset,
-                borderColor: utils.getColorStrForConstellationId(constellationId),
+                borderColor: utils.getColorStrOfConstellation(constellationId),
                 borderWidth: 1.5,
                 interpolate: true
             });

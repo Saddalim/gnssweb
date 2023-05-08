@@ -118,6 +118,8 @@ const defaultObserver = {
     minElevation: 0,
     maxElevation: 20
 };
+const invisibleOrbitOpacity = 0.07;
+const invisibleSatOpacity = 0.3;
 
 // DOM elements
 let timerSlider = null;
@@ -129,6 +131,7 @@ let elevationChart = null;
 
 // ECI scene elements
 let satelliteIcons = [];
+let satelliteOrbitLines = [];
 let observerMarker = null;
 
 // sat data
@@ -190,15 +193,16 @@ function hideSplash()
 
 function drawOrbitLine(scene, points, color = 0xffffff) {
     const orbitGeometry = new THREE.BufferGeometry().setFromPoints( points.map((pt) => eci2three(pt, false)) );
-    const orbitMaterial = new THREE.LineBasicMaterial({ color: color });
+    const orbitMaterial = new THREE.LineBasicMaterial({ color: color, transparent: true });
     const line = new THREE.Line( orbitGeometry, orbitMaterial );
     scene.add( line );
+    return line;
 }
 
-function drawSatelliteEci(scene, pos, color = 0xffffff) {
+function drawSatelliteEci(scene, pos, color = 0xffffff, isVisible = false) {
     const satGeometry = new THREE.BufferGeometry();
     satGeometry.setAttribute('position', new THREE.Float32BufferAttribute( eci2three(pos), 3));
-    const satMaterial = new THREE.PointsMaterial({ color: color, size: 2000.0 });
+    const satMaterial = new THREE.PointsMaterial({ color: color, transparent: true, opacity: isVisible ? 1.0 : invisibleSatOpacity, size: 2000.0 });
     const point = new THREE.Points( satGeometry, satMaterial);
     satelliteIcons.push(point);
     scene.add(point);
@@ -239,6 +243,10 @@ function drawObserverMarker(scene, time) {
         return;
 
     const idx = Math.round((time - minEpoch) / epochStep);
+
+    if (idx < 0 || idx >= observerPositionData.length)
+        return;
+
     const pos = observerPositionData[idx];
     const satGeometry = new THREE.BufferGeometry();
     satGeometry.setAttribute('position', new THREE.Float32BufferAttribute( eci2three(pos), 3));
@@ -262,17 +270,27 @@ function removeAllSatellites(scene) {
 function updateSatellites(scene, time) {
     removeAllSatellites(scene);
     drawObserverMarker(scene, time);
+
+    if (satellitePositionData == null)
+        return;
+
     const idx = Math.round((time - minEpoch) / epochStep);
-    for (const satelliteData of satellitePositionData)
-    {
-        drawSatelliteEci(scene, satelliteData.data[idx], utils.getColorStrForConstellationId(satelliteData.constellationId));
-    }
+
+    if (idx < 0 || idx >= satellitePositionData[0].data.length)
+        return;
+
+    satellitePositionData.forEach((satelliteData, satIdx) => {
+        const isVisible = visibilityData[satIdx].data[idx].y !== null;
+        drawSatelliteEci(scene, satelliteData.data[idx], utils.getColorOfConstellation(satelliteData.constellationId), isVisible);
+        satelliteOrbitLines[satIdx].material.opacity = (isVisible ? 1.0 : invisibleOrbitOpacity);
+    });
     drawSatellitesEcef(time);
 }
 
-function setSatellitesTime(scene, time) {
-    timerSlider.value = time;
-    timerSlider.dispatchEvent(new Event('input'));
+function onChartMouseMove(chart, evt, scene) {
+    const canvasPosition = Chart.helpers.getRelativePosition(evt, chart);
+    const dataX = chart.scales.x.getValueForPixel(canvasPosition.x);
+    updateSatellites(scene, dataX);
 }
 
 function syncCharts(source) {
@@ -492,27 +510,17 @@ window.onload = (evt) => {
                         min: 0,
                         max: 90.0
                     }
-                },
-            },
-            plugins: [{
-                id: 'globeDisplayer',
-                afterDatasetsDraw(chart, args, pluginOptions) {
-
-                },
-                beforeTooltipDraw(chart, args, options) {
-                    if (args.tooltip.dataPoints.length > 0)
-                    {
-                        const atEpoch = args.tooltip.dataPoints[0].parsed.x;
-                        if (atEpoch !== lastDrawnSatPosEpoch)
-                        {
-                            lastDrawnSatPosEpoch = atEpoch;
-                            setSatellitesTime(eciScene, atEpoch);
-                        }
-                    }
                 }
-            }]
+            }
         }
     );
+
+    visibilityLineChart.canvas.addEventListener('mousemove', (evt) => {
+        onChartMouseMove(visibilityLineChart, evt, eciScene);
+    });
+    elevationChart.canvas.addEventListener('mousemove', (evt) => {
+        onChartMouseMove(elevationChart, evt, eciScene);
+    });
 
     timerSlider = document.querySelector('#timeSelector');
     let calcBtn = document.querySelector('#start-calc-btn');
@@ -593,15 +601,9 @@ window.onload = (evt) => {
                 observerPositionData = data.observerPositionData;
                 visibilityData = data.visibilityLineData;
 
-                timerSlider.min = minEpoch;
-                timerSlider.max = maxEpoch;
-                timerSlider.value = minEpoch;
-                timerSlider.dispatchEvent(new Event('input'));
-                document.querySelector('#timeDisplay').innerHTML = moment(minEpoch).format('YYYY-MM-DD HH:mm');
-
-                for (const positionData of data.positionData) {
-                    drawOrbitLine(eciScene, positionData.data, utils.getColorStrForConstellationId(positionData.constellationId));
-                }
+                satellitePositionData.forEach((positionData, satIdx) => {
+                    satelliteOrbitLines[satIdx] = drawOrbitLine(eciScene, positionData.data, utils.getColorOfConstellation(positionData.constellationId));
+                });
                 updateSatellites(eciScene, minEpoch);
 
                 console.log("Done");
@@ -614,12 +616,6 @@ window.onload = (evt) => {
 
         drawObserverMarker(eciScene, formData);
 
-    });
-
-    timerSlider.addEventListener('input', (evt) => {
-        const timestamp = parseInt(evt.target.value);
-        updateSatellites(eciScene, timestamp);
-        document.querySelector('#timeDisplay').innerHTML = moment(timestamp).format('YYYY-MM-DD HH:mm');
     });
 }
 

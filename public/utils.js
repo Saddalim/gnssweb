@@ -32,6 +32,10 @@ const constellationColors = {
     'I': 0xff7f27, // IN
 };
 
-export function getColorStrForConstellationId(constellationId) {
-    return '#' + constellationColors[constellationId].toString(16).padStart(6, '0');
+export function getColorOfConstellation(constellationId) {
+    return constellationColors[constellationId];
+}
+
+export function getColorStrOfConstellation(constellationId) {
+    return '#' + getColorOfConstellation(constellationId).toString(16).padStart(6, '0');
 }
