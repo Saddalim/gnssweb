@@ -76,7 +76,7 @@ const satLayer = new Konva.Layer();
 
 // labels
 {
-    const labels = [{txt: 'N', deg: 0}, {txt: 'W', deg: Math.PI / 2.0}, {txt: 'S', deg: Math.PI}, {txt: 'E', deg: -Math.PI / 2.0}];
+    const labels = [{txt: 'N', deg: 0}, {txt: 'E', deg: Math.PI / 2.0}, {txt: 'S', deg: Math.PI}, {txt: 'W', deg: -Math.PI / 2.0}];
     for (const labelData of labels) {
         const label = new Konva.Text({
             x: ecefCanvasCenter + Math.sin(labelData.deg) * ecefCanvasCenter * 0.97,
@@ -242,15 +242,28 @@ function drawSatellitesEcef(time) {
             continue;
 
         const r = ((90.0 - angles.elevation) / 90.0) * (ECEFCANVASSIZE / 2.0);
+        const x = ecefCanvasCenter + r * Math.sin(utils.deg2rad(angles.azimuth));
+        const y = ecefCanvasCenter - r * Math.cos(utils.deg2rad(angles.azimuth));
+        const radius = 15;
+        const fontSize = 30;
         const satPoint = new Konva.Circle({
-            x: ecefCanvasCenter - r * Math.sin(utils.deg2rad(angles.azimuth)), // flip W-E
-            y: ecefCanvasCenter - r * Math.cos(utils.deg2rad(angles.azimuth)),
-            radius: 7,
+            x: x,
+            y: y,
+            radius: radius,
             fill: satData.borderColor,
             stroke: '#000',
             strokeWidth: 2
         });
+        const satLabel = new Konva.Text({
+            x: x - radius * 1.5,
+            y: y - radius - fontSize,
+            text: satData.label,
+            fill: '#fff',
+            fontSize: fontSize,
+            align: 'center'
+        });
         satLayer.add(satPoint);
+        satLayer.add(satLabel);
     }
     satLayer.draw();
 }

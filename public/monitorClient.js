@@ -180,7 +180,7 @@ window.onload = () => {
     socket.on('gnss-data', function(data) {
         console.log("new data", data);
         drawSatellitesOnSky(data.satData);
-        document.getElementById('disp-gnss-datatime').innerHTML = new Date().toISOString() + " LT";
+        document.getElementById('disp-gnss-datatime').innerHTML = new Date().toISOString() + " UTC";
     });
 
 }
