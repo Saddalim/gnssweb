@@ -1,0 +1,5 @@
+{
+  "port": 7653,
+  "clientRefreshInterval": 1000,
+  "logFilePath": "d:\\BME\\_ur\\2\\proj\\dump\\TES1\\"
+}

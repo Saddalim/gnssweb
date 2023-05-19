@@ -1,0 +1,8 @@
+body {
+    background-color: #333;
+    color: #ccc;
+}
+
+#canvas-sky-container {
+    max-height: 40rem;
+}
