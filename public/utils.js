@@ -24,9 +24,9 @@ export function eci2three(pos, asArray = true) {
 }
 
 const constellationColors = {
-    'G': 0x3282F6, // US
+    'G': 0x00ff00, // US
     'R': 0xff0000, // RU
-    'E': 0x00ff00, // EU
+    'E': 0x3282F6, // EU
     'C': 0x00ffff, // CN
     'J': 0xffffff, // JP
     'I': 0xff7f27, // IN
