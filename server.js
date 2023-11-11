@@ -1,4 +1,5 @@
 import express from 'express';
+import net from 'net';
 import bodyParser from "body-parser";
 import { fileURLToPath } from 'url';
 import * as path from 'path';
@@ -147,4 +148,17 @@ app.post('/req', urlencodedParser, (req, res) => {
 
 app.listen(config.port, () => {
     console.log("Listening on :" + config.port);
+});
+
+// Set up TCP server for Arduinos
+var server = net.createServer();
+server.on('connection', (conn) => {
+    
+    conn.on('data', (data) => {
+        conn.write('Szevasz, ' + data);
+    });
+});
+
+server.listen(config.tcpPort, () => {
+    console.log('TCP server listening on:' + config.tcpPort);
 });

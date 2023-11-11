@@ -29,11 +29,16 @@ let lastFileIdx = 0;
 let fileChanged = false;
 let fileWatcher = null;
 let lastGnssStatus = null;
+let lastGnssData = null;
+let lastDataTime = null;
 
 class UBX_NAV_SAT {
 
     constructor(payload) {
         const satCnt = payload.readUintLE(5, 1);
+        console.log(payload.subarray(0, 4));
+        this.dataTime = payload.readUintLE(0, 4);
+        console.log(this.dataTime);
         this.satData = [];
 
         for (let satIdx = 0; satIdx < satCnt; ++satIdx) {
@@ -44,7 +49,7 @@ class UBX_NAV_SAT {
                 svId: payload.readUintLE(satDataIdx + 1, 1),
                 cno: payload.readUintLE(satDataIdx + 2, 1),
                 elev: payload.readUintLE(satDataIdx + 3, 1),
-                azim: payload.readUintLE(satDataIdx + 4, 1)
+                azim: payload.readUintLE(satDataIdx + 4, 2)
             });
 
         }
@@ -87,9 +92,10 @@ function refreshClients() {
         // Check if there reason for no change is a new file
         let newestFileName = getMostRecentFileName(config.logFilePath);
         if (newestFileName === lastFileRead) {
-            console.warn("Possible GNSS connection loss!");
-            sendStatus('nok');
-            // TODO set a timeout before issuing a warning
+            if (Date.now() - lastDataTime > config.timeUntilConsideredDown) {
+                console.warn("Possible GNSS connection loss!");
+                sendStatus('nok');
+            }
         } else {
             if (fileWatcher !== null) {
                 fileWatcher.close();
@@ -105,6 +111,7 @@ function refreshClients() {
                 if (filename) {
                     //console.log(`${filename} has changed`);
                     fileChanged = true;
+                    lastDataTime = Date.now();
                 }
             });
         }
@@ -136,10 +143,11 @@ function refreshClients() {
         const messageLength = payloadLength + UBXheaderLength;
 
         if (messageClass === 0x01 && messageId === 0x35) {
-            const satData = new UBX_NAV_SAT(buffer.subarray(messageStartIdx + UBXpayloadOffset, messageStartIdx + messageLength));
+            console.log(buffer.subarray(messageStartIdx, messageStartIdx + messageLength));
+            lastGnssData = new UBX_NAV_SAT(buffer.subarray(messageStartIdx + UBXpayloadOffset, messageStartIdx + messageLength));
 
             clients.forEach(client => {
-                client.emit('gnss-data', satData);
+                client.emit('gnss-data', lastGnssData);
             });
         }
 
@@ -158,6 +166,7 @@ io.on('connection', (socket) => {
     clients.push(socket);
 
     socket.emit('gnss-status', { status: lastGnssStatus});
+    socket.emit('gnss-data', lastGnssData);
 
     socket.on('disconnect', () => {
         console.log('a user disconnected');

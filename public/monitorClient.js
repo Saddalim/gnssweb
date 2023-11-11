@@ -180,7 +180,11 @@ window.onload = () => {
     socket.on('gnss-data', function(data) {
         console.log("new data", data);
         drawSatellitesOnSky(data.satData);
-        document.getElementById('disp-gnss-datatime').innerHTML = new Date().toISOString() + " UTC";
+        const itowSeconds = data.dataTime / 1000;
+        const utcDateTime = moment().utc().startOf('week').add(itowSeconds - 27, 'seconds');
+        document.getElementById('disp-gnss-datatime').innerHTML =
+            data.dataTime + " iTOW<br>"
+            + utcDateTime.format("YYYY-MM-DD hh:mm:ss UTC") + "<br>";
     });
 
 }
