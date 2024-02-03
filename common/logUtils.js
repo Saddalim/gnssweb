@@ -10,7 +10,7 @@ export function fixAllLogFilesIn(logDir)
         if (file.endsWith('.log'))
         {
             console.log("Fixing: " + file);
-            fixLogFile(logDir + file);
+            fixLogFile(path.join(logDir, file));
         }
     });
 
@@ -44,6 +44,8 @@ export async function transformLogfile(logfile, observer)
         try {
             const outputFile = logfile + '.csv';
             const rawData = fs.readFileSync(logfile, 'ascii');
+
+            console.log("Transforming log file: " + logfile);
 
             let satIds = [];
             let data = [];
@@ -121,6 +123,8 @@ export async function getListOfLogFiles(logDir, stationId)
 export async function getLogData(logFile, observer)
 {
     const csvFile = logFile + '.csv';
+
+    console.log("Displaying log file: " + logFile);
 
     try
     {

@@ -9,7 +9,7 @@ import fs from "fs";
 const logDir = '/home/johnny/bme/gnss_logs/';
 const file = '/home/johnny/bme/gnss_logs/ST1_2023-12-20T03-00-00-630Z.log';
 
-(async () => {await logUtils.transformLogfile(file, common.stations[1]);})();
+(async () => {await logUtils.fixAllLogFilesIn(common.config.logFilePath);})();
 
 //(async () => {console.log(await logUtils.getListOfLogFiles(common.config.logFilePath, 1));})();
 

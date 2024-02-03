@@ -193,7 +193,7 @@ export function startMqttClient()
 
             obsLoggers[stationId].write(timestamp + ';' + satData.map((datum) => datum.constellationId + datum.satId + '=' + datum.snr).join(',') + '|');
 
-            stationMonitor.setRecordingState(stationId, true, satData.map(data => data.satId));
+            stationMonitor.setRecordingState(stationId, true, satData.map(data => data.constellationId + data.satId));
         }
         else if (topic.startsWith("cmd/"))
         {
