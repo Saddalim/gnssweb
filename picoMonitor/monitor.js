@@ -5,7 +5,6 @@ import { Server } from 'socket.io';
 import {fileURLToPath} from "url";
 import _ from 'underscore';
 import path from 'path';
-import {log} from "three/nodes";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

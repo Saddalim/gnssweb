@@ -12,7 +12,7 @@ let constellationIds = {
     'I': 'IRNSS'    // IN
 };
 
-export function parseFile(path, observer = null) {
+export function parseFile(path, observer = null, inECF = false) {
     try {
         const data = fs.readFileSync(path, 'utf8');
 
@@ -52,7 +52,8 @@ export function parseFile(path, observer = null) {
 
                 satData[constellationId][satId][timestamp] = {};
                 const eciCoords = satellite.ecfToEci({x: x, y: y, z: z}, time);
-                satData[constellationId][satId][timestamp].pos = { x: eciCoords.x, y: eciCoords.y, z: eciCoords.z };
+                satData[constellationId][satId][timestamp].pos = inECF  ? { x: x, y: y, z: z }
+                                                                        : { x: eciCoords.x, y: eciCoords.y, z: eciCoords.z };
 
                 if (observer !== null)
                 {

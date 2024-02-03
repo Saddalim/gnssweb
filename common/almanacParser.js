@@ -1,5 +1,5 @@
 import fs from 'fs';
-import * as GNSS from "./public/gnss.js";
+import * as GNSS from "../public/gnss.js";
 import {convert, LocalDateTime, ZoneOffset} from "@js-joda/core";
 import satellite from 'satellite.js';
 

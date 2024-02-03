@@ -1,4 +1,22 @@
 {
-  "port": 3000,
-  "gnssFilesPath": "d:\\BME\\_ur\\2\\proj\\"
+  "gnssFilesPath": "/home/johnny/bme/gnss_files",
+  "logFilePath": "/home/johnny/bme/gnss_logs",
+  "msgLogFilePath": "/home/johnny/bme/gnss_logs/msg",
+
+  "tcpServer": {
+    "port": 7660
+  },
+  "recorderServer": {
+    "port": 7661
+  },
+  "mqtt": {
+    "server": "mqtt://saddalim.ddns.net",
+    "shadow": true
+  },
+  "planner": {
+    "port": 7654
+  },
+  "stationMonitor": {
+    "port": 7662
+  }
 }

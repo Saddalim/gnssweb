@@ -1,0 +1,6 @@
+{
+  "port": 7653,
+  "clientRefreshInterval": 1000,
+  "timeUntilConsideredDown" : 3000,
+  "logFilePath": "/home/johnny/gnss/dump/TES1"
+}
