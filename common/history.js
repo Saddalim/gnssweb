@@ -17,15 +17,19 @@ async function readMeteoHistory(observerId)
 
     const meteoRegex = new RegExp(`^([0-9\-T\:\.Z]{24}) meteo\/${observerId}\\|(.*?)$`);
 
-    for await (const line of rl) {
-        const match = line.match(meteoRegex);
-        if (match)
-        {
-            const datum = JSON.parse(match[2]);
-            datum.time = match[1];
-            history.push(datum);
+    try
+    {
+        for await (const line of rl) {
+            const match = line.match(meteoRegex);
+            if (match)
+            {
+                const datum = JSON.parse(match[2]);
+                datum.time = match[1];
+                history.push(datum);
+            }
         }
     }
+    catch (ex) {}
 
     cache[observerId].meteo = history;
 }

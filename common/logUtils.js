@@ -122,6 +122,7 @@ export async function getListOfLogFiles(logDir, stationId)
 
 export async function getLogData(logFile, observer)
 {
+    if (logFile.length === 0) return [];
     const csvFile = logFile + '.csv';
 
     console.log("Displaying log file: " + logFile);

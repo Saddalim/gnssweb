@@ -48,5 +48,18 @@ export const stations = {
         descendingOnly: true,
         minSatCntInWindow: 4,
         minCommonWindowLength: 600
+    },
+
+    // Petofi
+    3: {
+        id: 3,
+        latitude: satellite.degreesToRadians(47.47913589464292),
+        longitude: satellite.degreesToRadians(19.06417429550307),
+        height: 120.0 / 1000.0, // [km]
+        azimuthLimits: {min: satellite.degreesToRadians(150), max: satellite.degreesToRadians(180)},
+        elevationLimits: {min: satellite.degreesToRadians(0), max: satellite.degreesToRadians(25)},
+        descendingOnly: true,
+        minSatCntInWindow: 3,
+        minCommonWindowLength: 600
     }
 };

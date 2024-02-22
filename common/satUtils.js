@@ -7,7 +7,7 @@ import * as sp3parser from './sp3parser.js';
 import satellite from "satellite.js";
 import * as utils from "../public/utils.js";
 import Immutable from "immutable";
-
+import path from 'path';
 
 let dataCache = {};
 
@@ -35,7 +35,7 @@ async function downloadDataFile(year, dayOfYear)
 
         const fileName = `COD0OPSFIN_${year}${dayOfYear.toString().padStart(3, '0')}0000_01D_05M_ORB.SP3`;
         const url = `http://ftp.aiub.unibe.ch/CODE/${year}/` + fileName + '.gz';
-        const destinationFile = common.config.gnssFilesPath + '/' + fileName;
+        const destinationFile = path.join(common.config.gnssFilesPath, fileName);
         let success = false;
 
         let file = fs.createWriteStream(destinationFile);
@@ -60,13 +60,15 @@ async function downloadDataFile(year, dayOfYear)
             console.error(err.message);
             reject("Could not connect to sat database");
         });
+        request.end();
+
     });
 }
 
 async function readDailyData(year, dayOfYear)
 {
     const fileName = `COD0OPSFIN_${year}${dayOfYear.toString().padStart(3, '0')}0000_01D_05M_ORB.SP3`;
-    const filePath = common.config.gnssFilesPath + '/' + fileName;
+    const filePath = path.join(common.config.gnssFilesPath, fileName);
 
     if (! fs.existsSync(filePath))
     {
