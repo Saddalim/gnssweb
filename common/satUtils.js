@@ -139,6 +139,8 @@ export function collectObservationWindows(observer)
     // TODO parse when new file is available and cache
     const rawData = sp3parser.parseFile(common.config.gnssFilesPath + '/COD.EPH_5D', observer);
 
+    const windowMargin = 5 * 60; // [s] time before and after a sat window to observe
+
     let obsWindows = [];
     let windowsByEpoch = {};
 
@@ -252,10 +254,11 @@ export function collectObservationWindows(observer)
         {
             // Window!
             let obsData = {
-                fromEpoch: parseInt(epochData[epochFromIdx]),
-                toEpoch: parseInt(epochData[epochIdx]),
+                fromEpoch: parseInt(epochData[epochFromIdx]) - windowMargin,
+                toEpoch: parseInt(epochData[epochIdx]) + windowMargin,
                 satIds: candidateSatIds.toArray()
             };
+
             if (obsWindows.length > 0 && obsWindows.at(-1).toEpoch >= obsData.fromEpoch)
             {
                 // overlapping with previous, merge
