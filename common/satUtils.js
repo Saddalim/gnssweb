@@ -256,10 +256,12 @@ export function collectObservationWindows(observer)
                 toEpoch: parseInt(epochData[epochIdx]),
                 satIds: candidateSatIds.toArray()
             };
-            if (obsWindows.length > 0 && obsWindows.at(-1).toEpoch > obsData.fromEpoch)
+            if (obsWindows.length > 0 && obsWindows.at(-1).toEpoch >= obsData.fromEpoch)
             {
                 // overlapping with previous, merge
-                obsWindows.at(-1).toEpoch = obsData.toEpoch;
+                let prevWindow = obsWindows.at(-1);
+                prevWindow.toEpoch = obsData.toEpoch;
+                prevWindow.satIds = candidateSatIds.union(prevWindow.satIds).toArray();
             }
             else
             {
