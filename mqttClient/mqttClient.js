@@ -1,5 +1,6 @@
 import * as common from '../common/common.js';
 import * as satUtils from '../common/satUtils.js';
+import * as history from '../common/history.js';
 import mqtt from "mqtt";
 import fs from "fs-extra";
 import * as stationMonitor from "../stationMonitor/stationMonitor.js";
@@ -229,7 +230,8 @@ export function startMqttClient()
                 return;
             }
 
-            let meteoData = getMeteoDataFromPayload(message);
+            const meteoData = getMeteoDataFromPayload(message);
+            history.addToMeteoHistory(stationId, meteoData);
             stationMonitor.updateLastActivity(stationId);
 
             console.log(`METEO from station ${stationId}: board: ${meteoData.boardTemp.toFixed(2)}°C, ambient: ${meteoData.ambientTemp.toFixed(2)}°C, pressure: ${meteoData.pressure.toFixed(2)}hPa, humidity: ${meteoData.humidity.toFixed(2)}%`);

@@ -42,5 +42,21 @@ export async function getMeteoHistory(observerId)
     if (! cache[observerId].hasOwnProperty('meteo'))
         await readMeteoHistory(observerId);
 
-    return cache[observerId]['meteo'];
+    if (! cache[observerId].hasOwnProperty('meteo'))
+        cache[observerId].meteo = [];
+
+    return cache[observerId].meteo;
+}
+
+export function addToMeteoHistory(observerId, meteoDatum)
+{
+    if (! cache.hasOwnProperty(observerId))
+        cache[observerId] = {};
+
+    if (! cache[observerId].hasOwnProperty('meteo'))
+        cache[observerId].meteo = [];
+
+    meteoDatum.time = (new Date()).toISOString();
+    cache[observerId]['meteo'].push(meteoDatum);
+
 }
