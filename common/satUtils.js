@@ -154,6 +154,9 @@ export function collectObservationWindows(observer)
 
     for (const [constellationId, satellites] of Object.entries(rawData))
     {
+        if (observer.hasOwnProperty('constellations') && ! observer.constellations.includes(constellationId))
+            continue;
+
         for (const [satId, epochs] of Object.entries(satellites))
         {
             let ascending = null;

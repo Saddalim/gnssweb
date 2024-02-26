@@ -46,8 +46,9 @@ export const stations = {
         azimuthLimits: {min: satellite.degreesToRadians(100), max: satellite.degreesToRadians(150)},
         elevationLimits: {min: satellite.degreesToRadians(0), max: satellite.degreesToRadians(25)},
         descendingOnly: true,
-        minSatCntInWindow: 4,
-        minCommonWindowLength: 600
+        minSatCntInWindow: 1,
+        minCommonWindowLength: 300,
+        constellations: ["G"]
     },
 
     // Petofi
