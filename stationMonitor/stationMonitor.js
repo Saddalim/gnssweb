@@ -24,7 +24,14 @@ app.get('/', (req, res) => {
 });
 
 app.post('/meteo', urlencodedParser, async (req, res) => {
-    res.json(await history.getMeteoHistory(parseInt(req.body.sid)));
+    const stationId = parseInt(req.body.sid);
+    const meteoHistory = await history.getMeteoHistory(stationId);
+    if (! lastKnownActivities.hasOwnProperty(stationId) && meteoHistory.length > 0)
+    {
+        lastKnownActivities[stationId] = meteoHistory[meteoHistory.length - 1].time;
+        io.emit('activity', {sid: stationId, time: lastKnownActivities[stationId]});
+    }
+    res.json(meteoHistory);
 });
 
 app.post('/logList', urlencodedParser, async (req, res) => {

@@ -45,7 +45,7 @@ export const stations = {
         height: 108.0 / 1000.0, // [km]
         azimuthLimits: {min: satellite.degreesToRadians(100), max: satellite.degreesToRadians(150)},
         elevationLimits: {min: satellite.degreesToRadians(0), max: satellite.degreesToRadians(25)},
-        descendingOnly: true,
+        descendingOnly: false,
         minSatCntInWindow: 1,
         minCommonWindowLength: 300,
         constellations: ["G"]
