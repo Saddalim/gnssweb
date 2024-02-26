@@ -101,15 +101,15 @@ export function startMqttClient()
                 let observationData = satUtils.collectObservationWindows(observer);
                 let topic = "obswindow/resp/" + stationId;
                 let payload = observationData.map((data) => data.fromEpoch + ';' + data.toEpoch + ';' + data.satIds.join(',')).join('|') + '$';
-                if (config.shadow === true)
+                if (config.shadow !== true)
                 {
                     mqttClient.publish(
                         topic,
                         payload,
                         {qos: 0, retain: false}
                     );
+                    logMessage(topic, JSON.stringify(observationData));
                 }
-                logMessage(topic, JSON.stringify(observationData));
                 stationMonitor.updateLastActivity(stationId);
             }
             else
