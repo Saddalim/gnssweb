@@ -8,25 +8,27 @@ import satellite from "satellite.js";
 import * as utils from "../public/utils.js";
 import Immutable from "immutable";
 import path from 'path';
+import * as mathUtils from "./mathUtils.js";
 
-let dataCache = {};
+let ultraRapidCache = {};
 
-/**
- * Linear interpolation
- * TODO shall be in mathUtils
- * @param x
- * @param y
- * @param a
- * @returns {number}
- */
-function lerp(x, y, a)
-{
-    return x * (1 - a) + y * a;
-}
-
-function lerpAll(x, y, a)
-{
-    return Object.fromEntries(Object.entries(x).map(e => [e[0], lerp(e[1], y[e[0]], a)]));
+const constellationData = {
+    'G': { // GPS
+        frequencies: { // By NMEA signal ID
+            1: 1575.42e6, // L1 C/A
+            6: 1227.6e6, // L2 CL
+            5: 0.0, // TODO L2 CM
+            7: 1176.45e6, // L5 I
+            8: 1176.45e6, // L5 Q
+        }
+    },
+    'E': { // Galileo
+        frequencies: { // By NMEA signal ID
+            7: 1575.42e6, // E1 C/B
+            1: 1176.45e6, // E5a
+            2: 1207.14e6, // E5b
+        }
+    }
 }
 
 async function downloadDataFile(year, dayOfYear)
@@ -38,10 +40,16 @@ async function downloadDataFile(year, dayOfYear)
         const destinationFile = path.join(common.config.gnssFilesPath, fileName);
         let success = false;
 
-        let file = fs.createWriteStream(destinationFile);
         let request = http.get(url, function(response) {
+            if (response.statusCode === 404)
+            {
+                reject("No final orbit available (yet?)");
+                return;
+            }
+
             const gunzip = zlib.createGunzip();
 
+            let file = fs.createWriteStream(destinationFile);
             response.pipe(gunzip);
             gunzip.pipe(file);
             file.on('finish', function () {
@@ -53,12 +61,12 @@ async function downloadDataFile(year, dayOfYear)
 
                 }).on("error", function(e) {
                     fs.unlink(destinationFile); // async delete
-                    reject("Sat data file not available");
+                    reject("Corrupt final orbit file");
             });
         }).on('error', function(err) {
             fs.unlink(destinationFile); // async delete
             console.error(err.message);
-            reject("Could not connect to sat database");
+            reject("Could not connect to AIUB");
         });
         request.end();
 
@@ -78,26 +86,47 @@ async function readDailyData(year, dayOfYear)
     return sp3parser.parseFile(filePath, null, true);
 }
 
+let dataCache = {};
+
 export async function getCoordsOfSat(constellationId, satId, time)
 {
     if (! (time instanceof LocalDateTime))
     {
         time = LocalDateTime.ofEpochSecond(time, ZoneOffset.UTC);
     }
+    const epocha = time.toEpochSecond(ZoneOffset.UTC);
 
     let year = time.year();
     let dayOfYear = time.dayOfYear();
 
-    if (! dataCache.hasOwnProperty(year))
-        dataCache[year] = {};
+    let timesAsArray = [];
 
-    if (! dataCache[year].hasOwnProperty(dayOfYear))
+    let foundInUltraRapid = false;
+    if (ultraRapidCache.hasOwnProperty(constellationId) &&
+        ultraRapidCache[constellationId].hasOwnProperty(satId))
     {
-        dataCache[year][dayOfYear] = await readDailyData(year, dayOfYear);
+        const times = Object.keys(ultraRapidCache[constellationId][satId]);
+        if (epocha > parseInt(times[0]) && epocha < parseInt(times[times.length - 1]))
+        {
+            timesAsArray = ultraRapidCache[constellationId][satId];
+            foundInUltraRapid = true;
+        }
+    }
+
+    if (!foundInUltraRapid)
+    {
+        if (! dataCache.hasOwnProperty(year))
+        {
+            dataCache[year] = {};
+        }
+        if (! dataCache[year].hasOwnProperty(dayOfYear))
+        {
+            dataCache[year][dayOfYear] = await readDailyData(year, dayOfYear);
+        }
+        timesAsArray = Object.entries(dataCache[year][dayOfYear][constellationId][satId]);
     }
 
     const epochToLookFor = time.toEpochSecond(ZoneOffset.ofHours(0));
-    const timesAsArray = Object.entries(dataCache[year][dayOfYear][constellationId][satId]);
     const epochIdx1 = timesAsArray.findIndex(entry => entry[0] >= epochToLookFor);
     if (epochIdx1 === -1)
     {
@@ -121,7 +150,7 @@ export async function getCoordsOfSat(constellationId, satId, time)
         const epochIdx0 = epochIdx1 - 1;
         const epochBefore = parseInt(timesAsArray[epochIdx0][0]);
         const a = (epochToLookFor - epochBefore) / (epochAfter - epochBefore);
-        const interpPos = lerpAll(timesAsArray[epochIdx0][1].pos, timesAsArray[epochIdx1][1].pos, a);
+        const interpPos = mathUtils.lerpAll(timesAsArray[epochIdx0][1].pos, timesAsArray[epochIdx1][1].pos, a);
         return {
             pos: interpPos
         };
@@ -134,25 +163,15 @@ export async function getLookAnglesOfSat(constellationId, satId, time, observer)
     return satellite.ecfToLookAngles(observer, satCoords.pos);
 }
 
-export function collectObservationWindows(observer)
+export function collectObservationWindows(observer, excludePast)
 {
     // TODO parse when new file is available and cache
-    const rawData = sp3parser.parseFile(common.config.gnssFilesPath + '/COD.EPH_5D', observer);
+    const rawData = sp3parser.parseFile(path.join(common.config.gnssFilesPath, 'COD.EPH_5D'), observer);
 
     const windowMargin = 5 * 60; // [s] time before and after a sat window to observe
 
     let obsWindows = [];
     let windowsByEpoch = {};
-
-    // dummy windows for testing - month goes from 0!!
-    /*
-    obsWindows.push({
-        fromEpoch: Date.UTC(2023, 11, 14, 1, 22, 0, 0) / 1000,
-        toEpoch: Date.UTC(2023, 11, 14, 1, 23, 0, 0) / 1000,
-        satIds: ["E13", "G2", "B29"]
-    });
-     */
-
 
     for (const [constellationId, satellites] of Object.entries(rawData))
     {
@@ -259,16 +278,19 @@ export function collectObservationWindows(observer)
                 satIds: candidateSatIds.toArray()
             };
 
-            if (obsWindows.length > 0 && obsWindows.at(-1).toEpoch >= obsData.fromEpoch)
+            if (!excludePast || obsData.toEpoch > Math.floor(Date.now() / 1000))
             {
-                // overlapping with previous, merge
-                let prevWindow = obsWindows.at(-1);
-                prevWindow.toEpoch = obsData.toEpoch;
-                prevWindow.satIds = candidateSatIds.union(prevWindow.satIds).toArray();
-            }
-            else
-            {
-                obsWindows.push(obsData);
+                if (obsWindows.length > 0 && obsWindows.at(-1).toEpoch >= obsData.fromEpoch)
+                {
+                    // overlapping with previous, merge
+                    let prevWindow = obsWindows.at(-1);
+                    prevWindow.toEpoch = obsData.toEpoch;
+                    prevWindow.satIds = candidateSatIds.union(prevWindow.satIds).toArray();
+                }
+                else
+                {
+                    obsWindows.push(obsData);
+                }
             }
         }
 
@@ -277,4 +299,29 @@ export function collectObservationWindows(observer)
     }
 
     return obsWindows;
+}
+
+export function reparseUltraRapid()
+{
+    ultraRapidCache = sp3parser.parseFile(path.join(common.config.gnssFilesPath, 'COD.EPH_U'));
+}
+
+export function calcHeight(dataSeries)
+{
+    const minh = 1;
+    const maxh = 10;
+    const hstep = 0.1;
+
+    const f = mathUtils.arange(
+        4.0 * Math.PI * minh / carrierWavelength,
+        4.0 * Math.PI * maxh / carrierWavelength,
+        4.0 * Math.PI * hstep / carrierWavelength
+    );
+
+    for (let [satId, data] of Object.entries(dataSeries))
+    {
+        data.sort((a, b) => a.elev - b.elev);
+        const ls = mathUtils.lombScargle(data.map(datum => datum.elev), data.map(datum => datum.snr), f, false);
+        console.log(ls);
+    }
 }

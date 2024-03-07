@@ -33,7 +33,7 @@ server.on('connection', (conn) => {
                 if (common.stations.hasOwnProperty(stationId))
                 {
                     const observer = common.stations[stationId];
-                    let observationData = satUtils.collectObservationWindows(observer);
+                    let observationData = satUtils.collectObservationWindows(observer, true);
                     conn.write(observationData.map((data) => data.fromEpoch + ';' + data.toEpoch + ';' + data.satIds.join(',')).join('|') + '$');
                 }
                 else

@@ -51,13 +51,13 @@ export const stations = {
         constellations: ["G"]
     },
 
-    // Petofi
+    // DOVH
     3: {
         id: 3,
-        latitude: satellite.degreesToRadians(47.47913589464292),
-        longitude: satellite.degreesToRadians(19.06417429550307),
+        latitude: satellite.degreesToRadians(47.468432),
+        longitude: satellite.degreesToRadians(19.067489),
         height: 120.0 / 1000.0, // [km]
-        azimuthLimits: {min: satellite.degreesToRadians(150), max: satellite.degreesToRadians(180)},
+        azimuthLimits: {min: satellite.degreesToRadians(160), max: satellite.degreesToRadians(220)},
         elevationLimits: {min: satellite.degreesToRadians(0), max: satellite.degreesToRadians(25)},
         descendingOnly: true,
         minSatCntInWindow: 3,

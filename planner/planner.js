@@ -31,7 +31,7 @@ app.post('/req', urlencodedParser, (req, res) => {
     };
 
     // TODO parse when new file is available and cache
-    const rawData = sp3parser.parseFile(common.config.gnssFilesPath + '/COD.EPH_5D', observer);
+    const rawData = sp3parser.parseFile(path.join(common.config.gnssFilesPath, 'COD.EPH_5D'), observer);
 
     let visibilityTimesPerSat = {};
     let visibilityLineDatasets = [];

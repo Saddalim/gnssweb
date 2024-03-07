@@ -10,6 +10,7 @@
     "fs-extra": "^11.2.0",
     "immutable": "^5.0.0-beta.4",
     "mqtt": "^5.3.3",
+    "node-schedule": "^2.1.1",
     "satellite.js": "^5.0.0",
     "socket.io": "^4.6.1",
     "three": "^0.151.3",

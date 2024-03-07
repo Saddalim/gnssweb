@@ -1,7 +1,7 @@
 {
-  "gnssFilesPath": "/home/johnny/bme/gnss_files",
-  "logFilePath": "/home/johnny/bme/gnss_logs",
-  "msgLogFilePath": "/home/johnny/bme/gnss_logs/msg",
+  "gnssFilesPath": "d:\\BME\\_ur\\diploma\\gnss_files",
+  "logFilePath": "d:\\BME\\_ur\\diploma\\log",
+  "msgLogFilePath": "d:\\BME\\_ur\\diploma\\log\\msglog",
 
   "tcpServer": {
     "port": 7660

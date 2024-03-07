@@ -72,9 +72,8 @@ div#canvas-ecef div.konvajs-content {
   color: #cccccc;
 }
 
-div#loading-overlay {
+div.loading-overlay, div.loading-window {
   display: none;
-  position: fixed;
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.7);
@@ -86,10 +85,23 @@ div#loading-overlay {
   margin: 0 auto;
 }
 
-div#loading-overlay > div#loading-overlay-content {
+div.loading-overlay {
+  position: fixed;
+}
+
+div.loading-window {
+  position: absolute;
+}
+
+div.loading-overlay > .loading-overlay-content, div.loading-window > .loading-overlay-content {
   position: absolute;
   top: 50%;
   left: 50%;
   color: #fff;
   transform: translate(-50%, -50%);
+}
+
+.loading-parent
+{
+  position: relative;
 }

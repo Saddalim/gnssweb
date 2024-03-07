@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import * as common from "./common.js";
 import readline from "readline";
+import {log, sign} from "three/nodes";
 
 export function fixAllLogFilesIn(logDir)
 {
@@ -67,15 +68,18 @@ export async function transformLogfile(logfile, observer)
                         console.error("Incorrect sat data part cnt: " + satParts.length);
                         continue;
                     }
-                    const satId = satParts[0];
+                    const satSignalId = satParts[0];
+                    const signalParts = satSignalId.split('/');
+                    const satId = signalParts[0];
+                    const signalId = signalParts.length > 1 ? signalParts[1] : 0;
                     const snr = parseInt(satParts[1]);
 
-                    let idx = satIds.findIndex((id) => id === satId);
+                    let idx = satIds.findIndex((id) => id === satSignalId);
                     if (idx === -1) {
                         idx = satIds.length;
-                        satIds.push(satId);
+                        satIds.push(satSignalId);
                     }
-                    const lookAngles = await satUtils.getLookAnglesOfSat(satId[0], satId.substring(1), timestamp, observer);
+                    const lookAngles = await satUtils.getLookAnglesOfSat(satId[0], parseInt(satId.substring(1)), timestamp, observer);
                     timeData[idx] = [lookAngles.azimuth, lookAngles.elevation, snr];
                 }
                 data.push({
@@ -123,7 +127,7 @@ export async function getListOfLogFiles(logDir, stationId)
 export async function getLogData(logFile, observer)
 {
     if (logFile.length === 0) return [];
-    const csvFile = logFile + '.csv';
+    const csvFile = logFile.endsWith('.csv') ? logFile : (logFile + '.csv');
 
     console.log("Displaying log file: " + logFile);
 
@@ -183,3 +187,4 @@ export async function getLogData(logFile, observer)
 
     return data;
 }
+

@@ -1,5 +1,6 @@
 import * as common from '../common/common.js';
 import * as satUtils from '../common/satUtils.js';
+import * as logUtils from '../common/logUtils.js';
 import * as history from '../common/history.js';
 import mqtt from "mqtt";
 import fs from "fs-extra";
@@ -98,7 +99,7 @@ export function startMqttClient()
                 }
 
                 const observer = common.stations[stationId];
-                let observationData = satUtils.collectObservationWindows(observer);
+                let observationData = satUtils.collectObservationWindows(observer, true);
                 let topic = "obswindow/resp/" + stationId;
                 let payload = observationData.map((data) => data.fromEpoch + ';' + data.toEpoch + ';' + data.satIds.join(',')).join('|') + '$';
                 if (config.shadow !== true)
@@ -147,6 +148,15 @@ export function startMqttClient()
                 {
                     console.log(`Station #${stationId} ended observation stream`);
                     obsLoggers[stationId].end();
+                    if (fs.statSync(obsLoggers[stationId].path).size > 0)
+                    {
+                        logUtils.transformLogfile(obsLoggers[stationId].path, common.stations[stationId])
+                            .then(r => console.log("Finished processing logfile: " + obsLoggers[stationId].path));
+                    }
+                    else
+                    {
+                        fs.unlink(obsLoggers[stationId].path);
+                    }
                     delete obsLoggers[stationId];
 
                     stationMonitor.setRecordingState(stationId, false, []);
@@ -163,36 +173,39 @@ export function startMqttClient()
         }
         else if (topic.startsWith("obs/"))
         {
-            let cmdTokens = topic.split('/');
+            const cmdTokens = topic.split('/');
             if (cmdTokens.length < 2)
             {
                 console.error("Incorrect obs topic syntax: " + topic);
                 return;
             }
 
-            let stationId = parseInt(cmdTokens[1]);
+            const stationId = parseInt(cmdTokens[1]);
 
             if (! obsLoggers.hasOwnProperty(stationId))
             {
                 openNewLogFile(stationId);
             }
 
-            let timestamp = message.readBigInt64BE(0);
+            const timestamp = message.readBigInt64BE(0);
+            const obsDataContainsSignalId = ((message.length - 8) % 4) === 0;
+            const satCnt = (message.length - 8) / (obsDataContainsSignalId ? 4 : 3);
             let satData = [];
-            let satCnt = (message.length - 8) / 3;
             for (let satIdx = 0; satIdx < satCnt; ++satIdx)
             {
-                let constellationId = String.fromCharCode(message.readUint8(8 + satIdx * 3));
-                let satId = message.readUint8(8 + satIdx * 3 + 1);
-                let snr = message.readUint8(8 + satIdx * 3 + 2);
+                const constellationId = String.fromCharCode(message.readUint8(8 + satIdx * 3));
+                const satId = message.readUint8(8 + satIdx * 3 + 1);
+                const snr = message.readUint8(8 + satIdx * 3 + 2);
+                const signalId = obsDataContainsSignalId ? message.readUint8(8 + satIdx * 3 + 3) : 0;
                 satData.push({
                     constellationId: constellationId,
                     satId: satId,
-                    snr: snr
+                    snr: snr,
+                    signalId : signalId
                 });
             }
 
-            obsLoggers[stationId].write(timestamp + ';' + satData.map((datum) => datum.constellationId + datum.satId + '=' + datum.snr).join(',') + '|');
+            obsLoggers[stationId].write(timestamp + ';' + satData.map((datum) => datum.constellationId + datum.satId + '/' + datum.signalId + '=' + datum.snr).join(',') + '|');
 
             stationMonitor.setRecordingState(stationId, true, satData.map(data => data.constellationId + data.satId));
         }

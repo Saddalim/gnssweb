@@ -125,7 +125,8 @@
                                     <div class="col-12">
                                         <select id="log-list-${stationDatum.id}" class="log-list form-control text-bg-dark" data-sid="${stationDatum.id}"></select>
                                         <br>
-                                        <div class="chart-container" style="min-height: 20em;">
+                                        <div class="chart-container loading-parent" style="min-height: 20em;">
+                                            <div class="loading-window" id="loading-window-${stationDatum.id}"><div class="loading-overlay-content"></div></div>
                                             <canvas id="canvas-${stationDatum.id}-snr"></canvas>
                                         </div>
                                     </div>
@@ -337,12 +338,23 @@
                         presshumCharts[stationDatum.id].update();
                     });
                 });
+
+                const loaderOverlay = document.getElementById(`loading-window-${stationDatum.id}`);
+                const showLoader = (text) => {
+                    loaderOverlay.querySelector('.loading-overlay-content').innerHTML = text;
+                    loaderOverlay.style.display = 'block';
+                };
+
+                const hideLoader = () => {
+                    loaderOverlay.style.display = 'none';
+                };
+                const selectDom = document.querySelector(`#log-list-${stationDatum.id}`);
+
                 fetch('/logList', {
                     method: 'post',
                     body: fetchData
                 }).then((resp) => {
                     resp.json().then((data) => {
-                        const selectDom = document.querySelector('#log-list-1');
                         for (const logFileName of data)
                         {
                             const elem = document.createElement('option');
@@ -353,55 +365,58 @@
                         selectDom.dispatchEvent(new Event('change'));
                     });
                 });
-            }
 
-            document.querySelector('.log-list').onchange = (evt) => {
-                let fetchData = new URLSearchParams();
-                const stationId = evt.target.dataset.sid;
-                fetchData.append('sid', 1);
-                fetchData.append('logFile', evt.target.value);
-                fetch ('/snrLog', {
-                    method: 'post',
-                    body: fetchData
-                }).then((resp) => {
-                    resp.json().then((data) => {
-                        if (data.hasOwnProperty('error'))
-                        {
+                selectDom.onchange = (evt) => {
+                    showLoader("Kezem kettő...");
+                    let fetchData = new URLSearchParams();
+                    const stationId = evt.target.dataset.sid;
+                    fetchData.append('sid', stationId);
+                    fetchData.append('logFile', evt.target.value);
+                    fetch ('/snrLog', {
+                        method: 'post',
+                        body: fetchData
+                    }).then((resp) => {
+                        resp.json().then((data) => {
+                            if (data.hasOwnProperty('error'))
+                            {
+                                snrCharts[stationId].data.datasets = [];
+                                snrCharts[stationId].update();
+                                showLoader(data.error);
+                                return;
+                            }
+                            const toDeg = 180.0 / Math.PI;
+                            let minTime = Number.MAX_VALUE;
+                            let maxTime = 0;
+                            let colorIdx = 0;
                             snrCharts[stationId].data.datasets = [];
-                            snrCharts[stationId].update();
-                            return;
-                        }
-                        const toDeg = 180.0 / Math.PI;
-                        let minTime = Number.MAX_VALUE;
-                        let maxTime = 0;
-                        let colorIdx = 0;
-                        snrCharts[stationId].data.datasets = [];
 
-                        for (const [satId, satData] of Object.entries(data))
-                        {
-                            if (satData.length === 0) continue;
-                            minTime = Math.min(minTime, satData[0].time);
-                            maxTime = Math.max(minTime, satData[satData.length - 1].time);
-                            snrCharts[stationId].data.datasets.push({
-                                label: satId + ' SNR',
-                                data: satData.map(datum => ({x: datum.time * 1000, y: datum.snr})),
-                                yAxisID: 'y',
-                                borderColor: colors[colorIdx]
-                            });
-                            snrCharts[stationId].data.datasets.push({
-                                label: satId + ' elev',
-                                data: satData.map(datum => ({x: datum.time * 1000, y: datum.elev * toDeg})),
-                                yAxisID: 'y1',
-                                borderColor: colors[colorIdx]
-                            });
-                            ++colorIdx;
-                        }
-                        snrCharts[stationId].options.scales.x.min = minTime * 1000;
-                        snrCharts[stationId].options.scales.x.max = maxTime * 1000;
-                        snrCharts[stationId].update();
+                            for (const [satId, satData] of Object.entries(data))
+                            {
+                                if (satData.length === 0) continue;
+                                minTime = Math.min(minTime, satData[0].time);
+                                maxTime = Math.max(minTime, satData[satData.length - 1].time);
+                                snrCharts[stationId].data.datasets.push({
+                                    label: satId + ' SNR',
+                                    data: satData.map(datum => ({x: datum.time * 1000, y: datum.snr})),
+                                    yAxisID: 'y',
+                                    borderColor: colors[colorIdx]
+                                });
+                                snrCharts[stationId].data.datasets.push({
+                                    label: satId + ' elev',
+                                    data: satData.map(datum => ({x: datum.time * 1000, y: datum.elev * toDeg})),
+                                    yAxisID: 'y1',
+                                    borderColor: colors[colorIdx]
+                                });
+                                ++colorIdx;
+                            }
+                            snrCharts[stationId].options.scales.x.min = minTime * 1000;
+                            snrCharts[stationId].options.scales.x.max = maxTime * 1000;
+                            snrCharts[stationId].update();
+                            hideLoader();
+                        });
                     });
-                });
-            };
+                };
+            }
         });
     </script>
 </body>
