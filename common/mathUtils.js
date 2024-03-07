@@ -1,4 +1,5 @@
 
+export const SPEED_OF_LIGHT = 299792458; // [m/s]
 
 /**
  * Linear interpolation

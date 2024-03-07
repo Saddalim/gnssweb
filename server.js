@@ -8,7 +8,7 @@ import * as satUtils from './common/satUtils.js';
 
 console.log("Starting components...");
 
-satUtils.reparseUltraRapid();
+satUtils.init();
 planner.startPlanner();
 stationMonitor.startStationMonitor();
 mqttClient.startMqttClient();

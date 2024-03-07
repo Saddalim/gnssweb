@@ -9,8 +9,11 @@ import * as utils from "../public/utils.js";
 import Immutable from "immutable";
 import path from 'path';
 import * as mathUtils from "./mathUtils.js";
+import {__dirname} from "./common.js";
 
+let dataCache = {};
 let ultraRapidCache = {};
+export let waterLevelHistory = [];
 
 const constellationData = {
     'G': { // GPS
@@ -20,15 +23,23 @@ const constellationData = {
             5: 0.0, // TODO L2 CM
             7: 1176.45e6, // L5 I
             8: 1176.45e6, // L5 Q
-        }
+        },
+        defaultFrequency: 1
     },
     'E': { // Galileo
         frequencies: { // By NMEA signal ID
             7: 1575.42e6, // E1 C/B
             1: 1176.45e6, // E5a
             2: 1207.14e6, // E5b
-        }
+        },
+        defaultFrequency: 7
     }
+}
+
+export function init()
+{
+    reparseUltraRapid();
+    loadWaterLevelHistory();
 }
 
 async function downloadDataFile(year, dayOfYear)
@@ -86,8 +97,6 @@ async function readDailyData(year, dayOfYear)
     return sp3parser.parseFile(filePath, null, true);
 }
 
-let dataCache = {};
-
 export async function getCoordsOfSat(constellationId, satId, time)
 {
     if (! (time instanceof LocalDateTime))
@@ -108,7 +117,7 @@ export async function getCoordsOfSat(constellationId, satId, time)
         const times = Object.keys(ultraRapidCache[constellationId][satId]);
         if (epocha > parseInt(times[0]) && epocha < parseInt(times[times.length - 1]))
         {
-            timesAsArray = ultraRapidCache[constellationId][satId];
+            timesAsArray = Object.entries(ultraRapidCache[constellationId][satId]);
             foundInUltraRapid = true;
         }
     }
@@ -306,22 +315,78 @@ export function reparseUltraRapid()
     ultraRapidCache = sp3parser.parseFile(path.join(common.config.gnssFilesPath, 'COD.EPH_U'));
 }
 
+function getWaterLevelHistoryFileOfStation(stationId)
+{
+    return path.join(common.config.gnssFilesPath, `wlh${stationId}.json`);
+}
+
+export function loadWaterLevelHistory()
+{
+    for (const station of Object.values(common.stations))
+    {
+        const historyFile = getWaterLevelHistoryFileOfStation(station.id);
+        waterLevelHistory[station.id] = fs.existsSync(historyFile) ? JSON.parse(fs.readFileSync(historyFile)) : [];
+    }
+}
+
+export function saveWaterLevelHistory(stationId)
+{
+    if (waterLevelHistory.hasOwnProperty(stationId))
+    {
+        fs.writeJsonSync(getWaterLevelHistoryFileOfStation(stationId), waterLevelHistory[stationId]);
+    }
+}
+
+export function addWaterLevelMeasurements(stationId, measurements)
+{
+    if (! waterLevelHistory.hasOwnProperty(stationId))
+    {
+        waterLevelHistory[stationId] = [];
+    }
+
+    for (const waterDatum of measurements)
+    {
+        waterLevelHistory[stationId].push(waterDatum);
+    }
+
+    saveWaterLevelHistory(stationId);
+}
+
+export function getWavelengthOfSignal(satSignalId)
+{
+    const constellationId = satSignalId[0];
+    const signalId = parseInt(satSignalId.substring(satSignalId.indexOf('/') + 1));
+    return mathUtils.SPEED_OF_LIGHT / constellationData[constellationId].frequencies[signalId === 0 ? constellationData[constellationId].defaultFrequency : signalId];
+}
+
 export function calcHeight(dataSeries)
 {
     const minh = 1;
     const maxh = 10;
     const hstep = 0.1;
 
-    const f = mathUtils.arange(
-        4.0 * Math.PI * minh / carrierWavelength,
-        4.0 * Math.PI * maxh / carrierWavelength,
-        4.0 * Math.PI * hstep / carrierWavelength
-    );
+    let results = [];
 
     for (let [satId, data] of Object.entries(dataSeries))
     {
+        const carrierWavelength = getWavelengthOfSignal(satId);
+
+        const f = mathUtils.arange(
+            4.0 * Math.PI * minh / carrierWavelength,
+            4.0 * Math.PI * maxh / carrierWavelength,
+            4.0 * Math.PI * hstep / carrierWavelength
+        );
+
+        const dataTime = data.reduce((maxTime, datum) => datum.time > maxTime ? datum.time : maxTime, 0);
+
         data.sort((a, b) => a.elev - b.elev);
         const ls = mathUtils.lombScargle(data.map(datum => datum.elev), data.map(datum => datum.snr), f, false);
-        console.log(ls);
+        const maxFreqIdx = ls.reduce((maxIdx, currAmp, currIdx, arr) => currAmp > arr[maxIdx] ? currIdx : maxIdx, 0);
+        results.push({
+            time: dataTime,
+            height: f[maxFreqIdx] * carrierWavelength / (4.0 * Math.PI)
+        });
     }
+
+    return results;
 }

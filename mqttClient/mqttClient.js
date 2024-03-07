@@ -6,6 +6,8 @@ import mqtt from "mqtt";
 import fs from "fs-extra";
 import * as stationMonitor from "../stationMonitor/stationMonitor.js";
 import path from "path";
+import {getLogData} from "../common/logUtils.js";
+import {addWaterLevelMeasurements} from "../common/satUtils.js";
 
 const __dirname = common.__dirname + '/mqttClient';
 const config = common.config.mqtt;
@@ -151,7 +153,13 @@ export function startMqttClient()
                     if (fs.statSync(obsLoggers[stationId].path).size > 0)
                     {
                         logUtils.transformLogfile(obsLoggers[stationId].path, common.stations[stationId])
-                            .then(r => console.log("Finished processing logfile: " + obsLoggers[stationId].path));
+                            .then(() => {
+                                console.log("Finished processing logfile: " + obsLoggers[stationId].path);
+                                return getLogData(obsLoggers[stationId].path, common.stations[stationId]);
+                            }).then((dataSeries) => {
+                                const newWaterLevelData = satUtils.calcHeight(dataSeries);
+                                addWaterLevelMeasurements(stationId, newWaterLevelData);
+                            });
                     }
                     else
                     {

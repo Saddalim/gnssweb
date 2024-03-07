@@ -1,20 +1,28 @@
 import * as common from './common/common.js';
 import * as satUtils from './common/satUtils.js';
 import * as logUtils from './common/logUtils.js';
+import * as sp3parser from './common/sp3parser.js';
 import * as mathUtils from './common/mathUtils.js';
 import * as history from './common/history.js';
 import {LocalDate, LocalDateTime, LocalTime} from "@js-joda/core";
 import satellite from "satellite.js";
 import fs from "fs";
 import * as predictionFetcher from "./predictionFetcher/predictionFetcher.js";
+import {getLogData} from "./common/logUtils.js";
+import {addWaterLevelMeasurements} from "./common/satUtils.js";
 
-const logDir = '/home/johnny/bme/gnss_logs/';
-const file = '/home/johnny/bme/gnss_logs/ST1_2024-01-24T16-40-00-041Z.log';
+const file = 'd:\\BME\\_ur\\diploma\\log\\ST2_2024-03-07T20-35-06-173Z.log';
+const station = common.stations[2];
 
-const str = 'G12/2=20';
-const g1 = str.split('=');
-const g2 = g1[0].split('/');
-console.log(g1, g2);
+satUtils.init();
+logUtils.transformLogfile(file, station)
+    .then(() => {
+        return getLogData(file, station);
+    }).then((dataSeries) => {
+        const newWaterLevelData = satUtils.calcHeight(dataSeries);
+        addWaterLevelMeasurements(station.id, newWaterLevelData);
+    });
+
 /*
 const csvFile = 'd:\\BME\\_ur\\diploma\\log\\ST1_2024-01-21T16-50-01-220Z.log';
 const satData = await logUtils.getLogData(csvFile, common.stations[1]);
