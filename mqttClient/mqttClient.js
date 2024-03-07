@@ -193,10 +193,10 @@ export function startMqttClient()
             let satData = [];
             for (let satIdx = 0; satIdx < satCnt; ++satIdx)
             {
-                const constellationId = String.fromCharCode(message.readUint8(8 + satIdx * 3));
-                const satId = message.readUint8(8 + satIdx * 3 + 1);
-                const snr = message.readUint8(8 + satIdx * 3 + 2);
-                const signalId = obsDataContainsSignalId ? message.readUint8(8 + satIdx * 3 + 3) : 0;
+                const constellationId = String.fromCharCode(message.readUint8(8 + satIdx * 4));
+                const satId = message.readUint8(8 + satIdx * 4 + 1);
+                const snr = message.readUint8(8 + satIdx * 4 + 2);
+                const signalId = obsDataContainsSignalId ? message.readUint8(8 + satIdx * 4 + 3) : 0;
                 satData.push({
                     constellationId: constellationId,
                     satId: satId,
