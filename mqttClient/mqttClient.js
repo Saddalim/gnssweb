@@ -149,13 +149,14 @@ export function startMqttClient()
                 if (obsLoggers.hasOwnProperty(stationId))
                 {
                     console.log(`Station #${stationId} ended observation stream`);
+                    const newLogFilePath = obsLoggers[stationId].path;
                     obsLoggers[stationId].end();
                     if (fs.statSync(obsLoggers[stationId].path).size > 0)
                     {
-                        logUtils.transformLogfile(obsLoggers[stationId].path, common.stations[stationId])
+                        logUtils.transformLogfile(newLogFilePath, common.stations[stationId])
                             .then(() => {
-                                console.log("Finished processing logfile: " + obsLoggers[stationId].path);
-                                return getLogData(obsLoggers[stationId].path, common.stations[stationId]);
+                                console.log("Finished processing logfile: " + newLogFilePath);
+                                return getLogData(newLogFilePath, common.stations[stationId]);
                             }).then((dataSeries) => {
                                 const newWaterLevelData = satUtils.calcHeight(dataSeries);
                                 addWaterLevelMeasurements(stationId, newWaterLevelData);
