@@ -35,8 +35,17 @@ const constellationData = {
         },
         defaultFrequency: 7
     },
+    'C': { // BeiDou
+        frequencies: { // By NMEA signal ID
+            1: 1561.098e6, // B1I D1/2
+            'B': 1207.14e6, // B2I D1/2
+            3: 1575.42e6, // B1C
+            5: 1176.45e6 // B2a
+        },
+        defaultFrequency: 1
+    },
     'R': { // Glonass
-        frequencies: {
+        frequencies: { // By NMEA signal ID
             1: {base: 1602.0e6, step: 0.5625e6}, // L1OF
             3: {base: 1246.0e6, step: 0.4375e6}, // L2OF
         },
@@ -396,9 +405,14 @@ export function getFrequencyOf(constellationId, satId, signalId)
         const realSignalId = signalId === 0 ? constellationData.R.defaultFrequency : signalId;
         return constellationData.R.frequencies[realSignalId].base + constellationData.R.bands[satId] * constellationData.R.frequencies[realSignalId].step;
     }
-    else
+    else if (constellationData.hasOwnProperty(constellationId))
     {
         return constellationData[constellationId].frequencies[signalId === 0 ? constellationData[constellationId].defaultFrequency : signalId];
+    }
+    else
+    {
+        console.error("Unknown constellation ID: " + constellationId);
+        return NaN;
     }
 }
 
