@@ -156,10 +156,12 @@ export function startMqttClient()
                         logUtils.transformLogfile(newLogFilePath, common.stations[stationId])
                             .then(() => {
                                 console.log("Finished processing logfile: " + newLogFilePath);
-                                return getLogData(newLogFilePath, common.stations[stationId]);
+                                return logUtils.getLogData(newLogFilePath, common.stations[stationId]);
                             }).then((dataSeries) => {
-                                const newWaterLevelData = satUtils.calcHeight(dataSeries);
+                                console.log("Calculating water level from logfile: " + newLogFilePath)
+                                const newWaterLevelData = satUtils.calcHeight(dataSeries, false);
                                 addWaterLevelMeasurements(stationId, newWaterLevelData);
+                                console.log("Water level measurements added");
                             });
                     }
                     else

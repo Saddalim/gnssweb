@@ -60,7 +60,7 @@ export const stations = {
         azimuthLimits: {min: satellite.degreesToRadians(160), max: satellite.degreesToRadians(220)},
         elevationLimits: {min: satellite.degreesToRadians(0), max: satellite.degreesToRadians(25)},
         descendingOnly: true,
-        minSatCntInWindow: 3,
+        minSatCntInWindow: 1,
         minCommonWindowLength: 600
     }
 };

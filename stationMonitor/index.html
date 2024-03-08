@@ -49,7 +49,7 @@
         const stationData = [
             { id: 1, name: 'Balatonkenese'},
             { id: 2, name: 'Keszthely'},
-            { id: 3, name: 'Petőfi-híd'}
+            { id: 3, name: 'DOVH'}
         ];
 
         let lastKnownActivityTimes = {};
@@ -116,6 +116,9 @@
                             </div>
                             <div class="card-body">
                                 <div class="row">
+                                    <div class="col-12 chart-container">
+                                        <canvas id="canvas-${stationDatum.id}-water-level"></canvas>
+                                    </div>
                                     <div class="col-12 col-md-6 chart-container">
                                         <canvas id="canvas-${stationDatum.id}-temperature"></canvas>
                                     </div>
@@ -124,10 +127,15 @@
                                     </div>
                                     <div class="col-12">
                                         <select id="log-list-${stationDatum.id}" class="log-list form-control text-bg-dark" data-sid="${stationDatum.id}"></select>
-                                        <br>
-                                        <div class="chart-container loading-parent" style="min-height: 20em;">
-                                            <div class="loading-window" id="loading-window-${stationDatum.id}"><div class="loading-overlay-content"></div></div>
+                                    </div>
+                                    <div class="col-12 loading-parent">
+                                    <div class="loading-window" id="loading-window-${stationDatum.id}"><div class="loading-overlay-content"></div></div>
+                                        <div class="chart-container" style="min-height: 20em;">
                                             <canvas id="canvas-${stationDatum.id}-snr"></canvas>
+                                        </div>
+                                        <br>
+                                        <div class="chart-container" style="min-height: 20em;">
+                                            <canvas id="canvas-${stationDatum.id}-periodogram"></canvas>
                                         </div>
                                     </div>
                                 </div>
@@ -163,12 +171,63 @@
                 min: minDate
             };
 
+            let waterLevelCharts = {};
             let tempCharts = {};
             let presshumCharts = {};
             let snrCharts = {};
+            let periodograms = {};
 
             for (const stationDatum of stationData)
             {
+                waterLevelCharts[stationDatum.id] = new Chart(
+                    document.querySelector(`#canvas-${stationDatum.id}-water-level`),
+                    {
+                        type: 'line',
+                        data: {
+                            datasets: []
+                        },
+                        options: {
+                            scales: {
+                                x: {
+                                    type: 'time',
+                                    time: {
+                                        unit: 'hour'
+                                    },
+                                    ticks: {
+                                        major: {
+                                            enabled: true
+                                        },
+                                        font: (ctx) => {
+                                            return {weight: (ctx.tick && ctx.tick.major) ? 'bold' : ''}
+                                        }
+                                    },
+                                    grid: {
+                                        lineWidth: (ctx) => {
+                                            return ctx.tick && ctx.tick.major ? 3 : 1;
+                                        }
+                                    },
+                                }
+                            },
+                            plugins: {
+                                zoom: {
+                                    pan: {
+                                        enabled: true
+                                    },
+                                    zoom: {
+                                        mode: 'x',
+                                        wheel: {
+                                            enabled: true
+                                        }
+                                    }
+                                }
+                            },
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            resizeDelay: 50
+                        }
+                    }
+                )
+
                 tempCharts[stationDatum.id] = new Chart(
                     document.querySelector(`#canvas-${stationDatum.id}-temperature`),
                     {
@@ -319,13 +378,60 @@
                     }
                 );
 
+                periodograms[stationDatum.id] = new Chart(
+                    document.querySelector(`#canvas-${stationDatum.id}-periodogram`),
+                    {
+                        type: 'scatter',
+                        data: {
+                            datasets: []
+                        },
+                        options: {
+                            elements: {
+                                point: {
+                                    radius: 0
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Reflection height [m]'
+                                    },
+                                },
+                                y: {
+                                    title: {
+                                        display: true,
+                                        text: 'Strength'
+                                    },
+                                }
+                            },
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            resizeDelay: 50
+                        }
+                    }
+                );
+
                 let fetchData = new URLSearchParams();
                 fetchData.append('sid', stationDatum.id);
+
+                fetch('/wl', {
+                    method: 'post',
+                    body: fetchData,
+                }).then(resp => {
+                    resp.json().then(data => {
+                        waterLevelCharts[stationDatum.id].data.datasets = [
+                            { data: data.map(datum => ({x: new Date(datum.time * 1000).toISOString(), y: datum.height})), label: 'Water level'}
+                        ];
+                        waterLevelCharts[stationDatum.id].update();
+                    });
+                });
+
                 fetch('/meteo', {
                     method: 'post',
                     body: fetchData,
-                }).then((resp) => {
-                    resp.json().then((data) => {
+                }).then(resp => {
+                    resp.json().then(data => {
                         tempCharts[stationDatum.id].data.datasets = [
                             { data: data.map(datum => ({x: datum.time, y: datum.ambientTemp })), label: 'Ambient temp' },
                             { data: data.map(datum => ({x: datum.time, y: datum.boardTemp })), label: 'Board temp' }
@@ -353,8 +459,8 @@
                 fetch('/logList', {
                     method: 'post',
                     body: fetchData
-                }).then((resp) => {
-                    resp.json().then((data) => {
+                }).then(resp => {
+                    resp.json().then(data => {
                         for (const logFileName of data)
                         {
                             const elem = document.createElement('option');
@@ -375,8 +481,8 @@
                     fetch ('/snrLog', {
                         method: 'post',
                         body: fetchData
-                    }).then((resp) => {
-                        resp.json().then((data) => {
+                    }).then(resp => {
+                        resp.json().then(data => {
                             if (data.hasOwnProperty('error'))
                             {
                                 snrCharts[stationId].data.datasets = [];
@@ -390,7 +496,7 @@
                             let colorIdx = 0;
                             snrCharts[stationId].data.datasets = [];
 
-                            for (const [satId, satData] of Object.entries(data))
+                            for (const [satId, satData] of Object.entries(data.snr))
                             {
                                 if (satData.length === 0) continue;
                                 minTime = Math.min(minTime, satData[0].time);
@@ -412,6 +518,15 @@
                             snrCharts[stationId].options.scales.x.min = minTime * 1000;
                             snrCharts[stationId].options.scales.x.max = maxTime * 1000;
                             snrCharts[stationId].update();
+
+                            periodograms[stationId].data.datasets = data.periodogram.map(series => ({
+                                data: series.periodogram.f.map((e, i) => ({ x: e, y: series.periodogram.a[i]})),
+                                label: series.periodogram.satId,
+                                showLine: true,
+                                borderWidth: 3,
+                            }));
+                            periodograms[stationId].update();
+
                             hideLoader();
                         });
                     });

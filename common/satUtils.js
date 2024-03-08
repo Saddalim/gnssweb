@@ -10,6 +10,7 @@ import Immutable from "immutable";
 import path from 'path';
 import * as mathUtils from "./mathUtils.js";
 import {__dirname} from "./common.js";
+import {sign} from "three/nodes";
 
 let dataCache = {};
 let ultraRapidCache = {};
@@ -33,6 +34,20 @@ const constellationData = {
             2: 1207.14e6, // E5b
         },
         defaultFrequency: 7
+    },
+    'R': { // Glonass
+        frequencies: {
+            1: {base: 1602.0e6, step: 0.5625e6}, // L1OF
+            3: {base: 1246.0e6, step: 0.4375e6}, // L2OF
+        },
+        defaultFrequency: 1,
+        bands: {
+             1:  1,  2: -4,  3:  5,  4:  6,  5:  1,
+             6: -4,  7:  5,  8:  6,  9: -2, 10: -7,
+            11:  0, 12: -1, 13: -2, 14: -7, 15:  0,
+            16: -1, 17:  4, 18: -3, 19:  3, 20:  2,
+            21:  4, 22: -3, 23:  3, 24:  2, 25: -5,
+        }
     }
 }
 
@@ -352,22 +367,59 @@ export function addWaterLevelMeasurements(stationId, measurements)
     saveWaterLevelHistory(stationId);
 }
 
-export function getWavelengthOfSignal(satSignalId)
+export function getWaterLevelHistoryOf(stationId)
 {
-    const constellationId = satSignalId[0];
-    const signalId = parseInt(satSignalId.substring(satSignalId.indexOf('/') + 1));
-    return mathUtils.SPEED_OF_LIGHT / constellationData[constellationId].frequencies[signalId === 0 ? constellationData[constellationId].defaultFrequency : signalId];
+    if (waterLevelHistory.hasOwnProperty(stationId))
+        return waterLevelHistory[stationId];
+    return [];
 }
 
-export function calcHeight(dataSeries)
+export function getWaterLevelStatisticalHistoryOf(stationId)
 {
-    const minh = 1;
-    const maxh = 10;
-    const hstep = 0.1;
+    let statHistory = [];
+    let prevTime = null;
+    for (const historyDatum of getWaterLevelHistoryOf(stationId))
+    {
+        if (historyDatum.time !== prevTime)
+        {
+            statHistory.push(historyDatum);
+            prevTime = historyDatum.time;
+        }
+    }
+    return statHistory;
+}
+
+export function getFrequencyOf(constellationId, satId, signalId)
+{
+    if (constellationId === 'R')
+    {
+        const realSignalId = signalId === 0 ? constellationData.R.defaultFrequency : signalId;
+        return constellationData.R.frequencies[realSignalId].base + constellationData.R.bands[satId] * constellationData.R.frequencies[realSignalId].step;
+    }
+    else
+    {
+        return constellationData[constellationId].frequencies[signalId === 0 ? constellationData[constellationId].defaultFrequency : signalId];
+    }
+}
+
+export function getWavelengthOfSignal(satSignalId)
+{
+    const idParts = satSignalId.split('/');
+    const constellationId = idParts[0][0];
+    const satId = idParts[0].substring(1);
+    const signalId = idParts.length > 1 ? parseInt(idParts[1]) : 0;
+    return mathUtils.SPEED_OF_LIGHT / getFrequencyOf(constellationId, satId, signalId);
+}
+
+export function calcHeight(dataSeries, withRawPeriodogram)
+{
+    const minh = 4;
+    const maxh = 7;
+    const hstep = 0.05;
 
     let results = [];
 
-    for (let [satId, data] of Object.entries(dataSeries))
+    for (const [satId, data] of Object.entries(dataSeries))
     {
         const carrierWavelength = getWavelengthOfSignal(satId);
 
@@ -378,14 +430,32 @@ export function calcHeight(dataSeries)
         );
 
         const dataTime = data.reduce((maxTime, datum) => datum.time > maxTime ? datum.time : maxTime, 0);
+        const filteredData = data.filter(datum => !isNaN(datum.elev) && !isNaN(datum.snr));
 
-        data.sort((a, b) => a.elev - b.elev);
-        const ls = mathUtils.lombScargle(data.map(datum => datum.elev), data.map(datum => datum.snr), f, false);
+        const ls = mathUtils.lombScargle(
+            filteredData.map(datum => Math.sin(datum.elev)),
+            filteredData.map(datum => datum.snr),
+            f,
+            true
+        );
+
         const maxFreqIdx = ls.reduce((maxIdx, currAmp, currIdx, arr) => currAmp > arr[maxIdx] ? currIdx : maxIdx, 0);
-        results.push({
+
+        let measurement = {
             time: dataTime,
             height: f[maxFreqIdx] * carrierWavelength / (4.0 * Math.PI)
-        });
+        };
+
+        if (withRawPeriodogram)
+        {
+            measurement.periodogram = {
+                satId: satId,
+                f: f.map(f => Math.round(((f * carrierWavelength / (4.0 * Math.PI)) + Number.EPSILON) * 100) / 100),
+                a: ls
+            };
+        }
+
+        results.push(measurement);
     }
 
     return results;

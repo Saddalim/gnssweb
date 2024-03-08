@@ -1,11 +1,13 @@
 import * as common from '../common/common.js';
 import * as history from '../common/history.js';
 import * as logUtils from '../common/logUtils.js';
+import * as satUtils from '../common/satUtils.js';
 import express from 'express';
 import http from 'http';
 import {Server} from 'socket.io';
 import path from "path";
 import bodyParser from "body-parser";
+import {getWaterLevelStatisticalHistoryOf} from "../common/satUtils.js";
 
 const __dirname = common.__dirname + '/stationMonitor';
 const config = common.config.stationMonitor;
@@ -39,7 +41,15 @@ app.post('/logList', urlencodedParser, async (req, res) => {
 });
 
 app.post('/snrLog', urlencodedParser, async (req, res) => {
-    res.json(await logUtils.getLogData(path.join(common.config.logFilePath, req.body.logFile), common.stations[req.body.sid]));
+    const data = await logUtils.getLogData(path.join(common.config.logFilePath, req.body.logFile), common.stations[req.body.sid]);
+    res.json({
+        snr: data,
+        periodogram: satUtils.calcHeight(data, true)
+    });
+});
+
+app.post('/wl', urlencodedParser, async (req, res) => {
+    res.json(await satUtils.getWaterLevelStatisticalHistoryOf(parseInt(req.body.sid)));
 });
 
 io.on('connection', (socket) => {
