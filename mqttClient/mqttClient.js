@@ -216,9 +216,9 @@ export function startMqttClient()
                 });
             }
 
-            obsLoggers[stationId].write(timestamp + ';' + satData.map((datum) => datum.constellationId + datum.satId + '/' + datum.signalId + '=' + datum.snr).join(',') + '|');
+            obsLoggers[stationId].write(timestamp + ';' + satData.map(datum => datum.constellationId + datum.satId + '/' + datum.signalId + '=' + datum.snr).join(',') + '|');
 
-            stationMonitor.setRecordingState(stationId, true, satData.map(data => data.constellationId + data.satId));
+            stationMonitor.setRecordingState(stationId, true, satData.map(datum => datum.constellationId + datum.satId + '/' + datum.signalId));
         }
         else if (topic.startsWith("cmd/"))
         {
