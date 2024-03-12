@@ -131,19 +131,12 @@ export async function getLogData(logFile, observer)
 
     console.log("Displaying log file: " + logFile);
 
-    try
+    if (! fs.existsSync(csvFile))
     {
-        if (! fs.existsSync(csvFile))
-        {
-            if (! fs.existsSync(logFile))
-                throw new Error("No such log file: " + logFile);
+        if (! fs.existsSync(logFile))
+            throw new Error("No such log file: " + logFile);
 
-            await transformLogfile(logFile, observer);
-        }
-    }
-    catch (ex)
-    {
-        return {error: ex};
+        await transformLogfile(logFile, observer);
     }
 
     const fileStream = fs.createReadStream(csvFile);

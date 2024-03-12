@@ -41,11 +41,18 @@ app.post('/logList', urlencodedParser, async (req, res) => {
 });
 
 app.post('/snrLog', urlencodedParser, async (req, res) => {
-    const data = await logUtils.getLogData(path.join(common.config.logFilePath, req.body.logFile), common.stations[req.body.sid]);
-    res.json({
-        snr: data,
-        periodogram: satUtils.calcHeight(data, true)
-    });
+    try
+    {
+        const data = await logUtils.getLogData(path.join(common.config.logFilePath, req.body.logFile), common.stations[req.body.sid]);
+        res.json({
+            snr: data,
+            periodogram: satUtils.calcHeight(data, common.stations[req.body.sid], true)
+        });
+    }
+    catch (ex)
+    {
+        res.json({error: ex});
+    }
 });
 
 app.post('/wl', urlencodedParser, async (req, res) => {

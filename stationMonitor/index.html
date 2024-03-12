@@ -6,9 +6,10 @@
     <title>StationMonitor</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.2.1/chart.umd.min.js" integrity="sha512-GCiwmzA0bNGVsp1otzTJ4LWQT2jjGJENLGyLlerlzckNI30moi2EQT0AfRI7fLYYYDKR+7hnuh35r3y1uJzugw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-error-bars@4.3.4/build/index.umd.min.js" integrity="sha256-UbfTH5GKiCl/jMLrmIElnJhYWGNDq7QoIwRZWpPmn1c=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" integrity="sha256-UDxwmAK+KFxnav4Dab9fcgZtCwwjkpGIwxWPNcAyepw=" crossorigin="anonymous"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" integrity="sha256-UDxwmAK+KFxnav4Dab9fcgZtCwwjkpGIwxWPNcAyepw=" crossorigin="anonymous"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/moment@^2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@^1"></script>
@@ -135,6 +136,10 @@
                                         </div>
                                         <br>
                                         <div class="chart-container" style="min-height: 20em;">
+                                            <canvas id="canvas-${stationDatum.id}-elev-snr"></canvas>
+                                        </div>
+                                        <br>
+                                        <div class="chart-container" style="min-height: 20em;">
                                             <canvas id="canvas-${stationDatum.id}-periodogram"></canvas>
                                         </div>
                                     </div>
@@ -175,6 +180,7 @@
             let tempCharts = {};
             let presshumCharts = {};
             let snrCharts = {};
+            let elevSnrCharts = {};
             let periodograms = {};
 
             for (const stationDatum of stationData)
@@ -182,7 +188,7 @@
                 waterLevelCharts[stationDatum.id] = new Chart(
                     document.querySelector(`#canvas-${stationDatum.id}-water-level`),
                     {
-                        type: 'line',
+                        type: 'lineWithErrorBars',
                         data: {
                             datasets: []
                         },
@@ -378,6 +384,55 @@
                     }
                 );
 
+                elevSnrCharts[stationDatum.id] = new Chart(
+                    document.querySelector(`#canvas-${stationDatum.id}-elev-snr`),
+                    {
+                        type: 'scatter',
+                        data: {
+                            datasets: []
+                        },
+                        options: {
+                            scales: {
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Sine of elevation'
+                                    },
+                                },
+                                y: {
+                                    title: {
+                                        display: true,
+                                        text: 'SNR [dB]'
+                                    },
+                                    min: 0
+                                }
+                            },
+                            elements: {
+                                point: {
+                                    radius: 0
+                                }
+                            },
+                            plugins: {
+                                zoom: {
+                                    pan: {
+                                        enabled: true,
+                                        mode: 'x'
+                                    },
+                                    zoom: {
+                                        mode: 'x',
+                                        wheel: {
+                                            enabled: true
+                                        }
+                                    }
+                                }
+                            },
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            resizeDelay: 50
+                        }
+                    }
+                );
+
                 periodograms[stationDatum.id] = new Chart(
                     document.querySelector(`#canvas-${stationDatum.id}-periodogram`),
                     {
@@ -420,9 +475,17 @@
                     body: fetchData,
                 }).then(resp => {
                     resp.json().then(data => {
-                        waterLevelCharts[stationDatum.id].data.datasets = [
-                            { data: data.map(datum => ({x: new Date(datum.time * 1000).toISOString(), y: datum.height})), label: 'Water level'}
-                        ];
+                        waterLevelCharts[stationDatum.id].data.datasets = [{
+                            data: data.map(datum => ({
+                                x: new Date(datum.time * 1000).toISOString(),
+                                y: datum.h[Math.floor(datum.h.length / 2)],
+                                yMin: datum.h[0],
+                                yMax: datum.h[datum.length - 1]
+                            })),
+                            label: 'Water level',
+                            errorBarColor: '#2B638A',
+                            errorBarWhiskerColor: '#2B638A'
+                        }];
                         waterLevelCharts[stationDatum.id].update();
                     });
                 });
@@ -487,6 +550,10 @@
                             {
                                 snrCharts[stationId].data.datasets = [];
                                 snrCharts[stationId].update();
+                                periodograms[stationId].data.datasets = [];
+                                periodograms[stationId].update();
+                                elevSnrCharts[stationId].data.datasets = [];
+                                elevSnrCharts[stationId].update();
                                 showLoader(data.error);
                                 return;
                             }
@@ -518,6 +585,32 @@
                             snrCharts[stationId].options.scales.x.min = minTime * 1000;
                             snrCharts[stationId].options.scales.x.max = maxTime * 1000;
                             snrCharts[stationId].update();
+
+                            elevSnrCharts[stationId].data.datasets = [];
+                            colorIdx = 0;
+                            for (const series of data.periodogram)
+                            {
+                                elevSnrCharts[stationId].data.datasets.push({
+                                    data: series.periodogram.elevSin.map((e, i) => ({ x: e, y: series.periodogram.elevSnrs[i]})),
+                                    label: series.periodogram.satId,
+                                    showLine: true,
+                                    borderWidth: 3,
+                                    borderColor: colors[colorIdx]
+                                });
+
+                                const tl = series.periodogram.trendLine;
+                                elevSnrCharts[stationId].data.datasets.push({
+                                    data: series.periodogram.elevSin.map((e, i) => ({ x: e, y: tl[0] + tl[1] * e + tl[2] * e**2})),
+                                    label: series.periodogram.satId + " trendline",
+                                    showLine: true,
+                                    borderWidth: 3,
+                                    borderDash: [3, 3],
+                                    borderColor: colors[colorIdx]
+                                });
+
+                                ++colorIdx;
+                            }
+                            elevSnrCharts[stationId].update();
 
                             periodograms[stationId].data.datasets = data.periodogram.map(series => ({
                                 data: series.periodogram.f.map((e, i) => ({ x: e, y: series.periodogram.a[i]})),

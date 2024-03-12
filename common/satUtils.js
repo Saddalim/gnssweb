@@ -336,7 +336,7 @@ export function collectObservationWindows(observer, excludePast)
 
 export function reparseUltraRapid()
 {
-    ultraRapidCache = sp3parser.parseFile(path.join(common.config.gnssFilesPath, 'COD.EPH_U'));
+    ultraRapidCache = sp3parser.parseFile(path.join(common.config.gnssFilesPath, 'COD.EPH_U'), null, true);
 }
 
 function getWaterLevelHistoryFileOfStation(stationId)
@@ -389,9 +389,15 @@ export function getWaterLevelStatisticalHistoryOf(stationId)
     let prevTime = null;
     for (const historyDatum of getWaterLevelHistoryOf(stationId))
     {
-        if (historyDatum.time !== prevTime)
+        if (historyDatum.time === prevTime)
         {
-            statHistory.push(historyDatum);
+            statHistory[statHistory.length - 1].h.push(historyDatum.height);
+        }
+        else
+        {
+            if (prevTime !== null)
+                statHistory[statHistory.length - 1].h.sort();
+            statHistory.push({time: historyDatum.time, h: [historyDatum.height]});
             prevTime = historyDatum.time;
         }
     }
@@ -425,30 +431,44 @@ export function getWavelengthOfSignal(satSignalId)
     return mathUtils.SPEED_OF_LIGHT / getFrequencyOf(constellationId, satId, signalId);
 }
 
-export function calcHeight(dataSeries, withRawPeriodogram)
+/**
+ * Calculate water level height measurements from the given measurement data series
+ * @param {*[]} dataSeries
+ * @param {*[]} station
+ * @param {boolean} withRawPeriodogram
+ * @returns {*[]}
+ */
+export function calcHeight(dataSeries, station, withRawPeriodogram)
 {
-    const minh = 4;
-    const maxh = 7;
-    const hstep = 0.05;
+    const hstep = 0.01;
 
     let results = [];
 
     for (const [satId, data] of Object.entries(dataSeries))
     {
+        const filteredData = data
+            .filter(datum => !isNaN(datum.elev) && !isNaN(datum.snr))
+            .filter(datum => mathUtils.isWithin(datum.elev, station.elevationLimits) && mathUtils.isWithin(datum.azim, station.azimuthLimits));
+
+        if (filteredData.length < 250) continue;
+
         const carrierWavelength = getWavelengthOfSignal(satId);
 
         const f = mathUtils.arange(
-            4.0 * Math.PI * minh / carrierWavelength,
-            4.0 * Math.PI * maxh / carrierWavelength,
+            4.0 * Math.PI * station.heightLimits.min / carrierWavelength,
+            4.0 * Math.PI * station.heightLimits.max / carrierWavelength,
             4.0 * Math.PI * hstep / carrierWavelength
         );
 
         const dataTime = data.reduce((maxTime, datum) => datum.time > maxTime ? datum.time : maxTime, 0);
-        const filteredData = data.filter(datum => !isNaN(datum.elev) && !isNaN(datum.snr));
+        const elevSin = filteredData.map(datum => Math.sin(datum.elev));
+        const elevSnrs = filteredData.map(datum => datum.snr);
+
+        const fitFunction = mathUtils.quadraticFit(elevSin, elevSnrs);
 
         const ls = mathUtils.lombScargle(
-            filteredData.map(datum => Math.sin(datum.elev)),
-            filteredData.map(datum => datum.snr),
+            elevSin,
+            elevSnrs.map((snr, idx) => snr - (fitFunction[0] + fitFunction[1] * elevSin[idx] + fitFunction[2] * elevSin[idx]**2)),
             f,
             true
         );
@@ -465,7 +485,10 @@ export function calcHeight(dataSeries, withRawPeriodogram)
             measurement.periodogram = {
                 satId: satId,
                 f: f.map(f => Math.round(((f * carrierWavelength / (4.0 * Math.PI)) + Number.EPSILON) * 100) / 100),
-                a: ls
+                a: ls,
+                elevSin: elevSin,
+                elevSnrs: elevSnrs,
+                trendLine: fitFunction
             };
         }
 

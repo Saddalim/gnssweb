@@ -31,10 +31,11 @@ export const stations = {
         longitude: satellite.degreesToRadians(18.110587),
         height: 108.0 / 1000.0, // [km]
         azimuthLimits: {min: satellite.degreesToRadians(110), max: satellite.degreesToRadians(220)},
-        elevationLimits: {min: satellite.degreesToRadians(0), max: satellite.degreesToRadians(25)},
+        elevationLimits: {min: satellite.degreesToRadians(-5), max: satellite.degreesToRadians(25)},
         descendingOnly: true,
-        minSatCntInWindow: 4,
-        minCommonWindowLength: 600
+        minSatCntInWindow: 3,
+        minCommonWindowLength: 600,
+        heightLimits: {min: 3.5, max: 5.5} // [m]
     },
 
     // Keszthely
@@ -44,11 +45,12 @@ export const stations = {
         longitude: satellite.degreesToRadians(17.264326770782656),
         height: 108.0 / 1000.0, // [km]
         azimuthLimits: {min: satellite.degreesToRadians(100), max: satellite.degreesToRadians(150)},
-        elevationLimits: {min: satellite.degreesToRadians(0), max: satellite.degreesToRadians(25)},
+        elevationLimits: {min: satellite.degreesToRadians(-5), max: satellite.degreesToRadians(25)},
         descendingOnly: false,
         minSatCntInWindow: 1,
         minCommonWindowLength: 300,
-        constellations: ["G"]
+        constellations: ["G"],
+        heightLimits: {min: 3.0, max: 6.5} // [m]
     },
 
     // DOVH
@@ -57,10 +59,12 @@ export const stations = {
         latitude: satellite.degreesToRadians(47.468432),
         longitude: satellite.degreesToRadians(19.067489),
         height: 120.0 / 1000.0, // [km]
-        azimuthLimits: {min: satellite.degreesToRadians(160), max: satellite.degreesToRadians(220)},
-        elevationLimits: {min: satellite.degreesToRadians(0), max: satellite.degreesToRadians(25)},
+        azimuthLimits: {min: satellite.degreesToRadians(150), max: satellite.degreesToRadians(230)},
+        elevationLimits: {min: satellite.degreesToRadians(-5), max: satellite.degreesToRadians(25)},
         descendingOnly: true,
         minSatCntInWindow: 1,
-        minCommonWindowLength: 600
+        minCommonWindowLength: 600,
+        constellations: ["G"],
+        heightLimits: {min: 4.5, max: 6.5} // [m]
     }
 };
